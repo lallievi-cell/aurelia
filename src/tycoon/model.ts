@@ -5,6 +5,7 @@ export type Focus = "sintesi" | "biologici";
 export type Modality = "chimica" | "biologico";
 export type Role = "scientist" | "operator" | "qa" | "clinical" | "regulatory" | "commercial";
 export type Tone = "good" | "bad" | "info";
+export type Branch = "casa" | "impianto" | "qualita" | "molecole";
 export type Era = "early" | "mid" | "late" | "oltre";
 export type MatKey = "api" | "solvent" | "eccipient";
 export type ParcelId = "fondazione" | "logistica" | "produzione" | "scienza" | "clinica";
@@ -160,6 +161,7 @@ export type Game = {
   vials: number;
   science: number;
   tech: TechId[];
+  mastered: TechId[];
   autoBuy: boolean;
   clients: Client[];
   offers: Offer[];
@@ -179,7 +181,7 @@ export type Game = {
   history: number[];
 };
 
-export type TechDef = { id: TechId; era: Era; name: string; blurb: string; cash: number; sci: number; need: TechId[] };
+export type TechDef = { id: TechId; era: Era; branch: Branch; name: string; blurb: string; deep: string; cash: number; sci: number; need: TechId[] };
 export type RoomDef = {
   type: RoomType;
   name: string;
@@ -233,31 +235,31 @@ export const PARCELS: { id: ParcelId; name: string; c0: number; r0: number; c1: 
 ];
 
 export const TECH: TechDef[] = [
-  { id: "gmp", era: "early", name: "GMP di base", blurb: "Spogliatoio e disciplina di produzione.", cash: 28_000, sci: 5, need: [] },
-  { id: "acquisti", era: "early", name: "Ufficio acquisti", blurb: "Scaffali più utili e materie meno care.", cash: 24_000, sci: 4, need: [] },
-  { id: "formazione", era: "early", name: "Formazione", blurb: "Puoi far crescere l'abilità.", cash: 20_000, sci: 4, need: [] },
-  { id: "commerciale", era: "early", name: "Sala contratti", blurb: "Un commerciale alza la paga dei lotti.", cash: 30_000, sci: 5, need: ["gmp"] },
-  { id: "reattore50", era: "early", name: "Reattore 50 L", blurb: "Il pilota prende anche contratti standard.", cash: 70_000, sci: 8, need: ["gmp"] },
-  { id: "classeC", era: "mid", name: "Classe C", blurb: "Sblocca il lotto produzione e l'impianto GMP.", cash: 140_000, sci: 12, need: ["reattore50"] },
-  { id: "analitica", era: "mid", name: "Analitica", blurb: "HPLC, quarantena, microbiologia.", cash: 90_000, sci: 12, need: ["gmp"] },
-  { id: "scaleup", era: "mid", name: "Scale-up", blurb: "Reattore da 200 L e sintetizzatore.", cash: 160_000, sci: 14, need: ["reattore50", "analitica"] },
-  { id: "freddo", era: "mid", name: "Catena del freddo", blurb: "Cella frigo e freezer campioni.", cash: 80_000, sci: 10, need: ["gmp"] },
-  { id: "packaging", era: "mid", name: "Packaging", blurb: "Confezionamento e spedizioni.", cash: 60_000, sci: 8, need: ["gmp"] },
-  { id: "utilities", era: "mid", name: "Utilities", blurb: "La centralina alza i kW del sito.", cash: 70_000, sci: 10, need: ["classeC"] },
-  { id: "scoperta", era: "mid", name: "Scoperta", blurb: "Sblocca il lotto scienza e il laboratorio.", cash: 100_000, sci: 12, need: ["gmp"] },
-  { id: "acque", era: "mid", name: "Acque", blurb: "Loop PW e WFI, necessari alla suite.", cash: 90_000, sci: 12, need: ["utilities"] },
-  { id: "asettico", era: "late", name: "Processo asettico", blurb: "Sblocca la suite sterile.", cash: 220_000, sci: 18, need: ["classeC", "freddo", "acque"] },
-  { id: "preclinica", era: "late", name: "Preclinica", blurb: "Saggi e tossicologia in vitro.", cash: 140_000, sci: 16, need: ["scoperta"] },
-  { id: "brevetti", era: "late", name: "Brevetti", blurb: "Deposito meno caro.", cash: 80_000, sci: 14, need: ["scoperta"] },
-  { id: "clinica1", era: "late", name: "Clinica I", blurb: "Sblocca il lotto clinica e la fase I.", cash: 180_000, sci: 18, need: ["brevetti", "preclinica"] },
-  { id: "clinica2", era: "late", name: "Clinica II", blurb: "Unità di fase II e III.", cash: 200_000, sci: 20, need: ["clinica1"] },
-  { id: "clinica3", era: "late", name: "Clinica III", blurb: "Biostatistica e archivio TMF.", cash: 220_000, sci: 22, need: ["clinica2"] },
-  { id: "affari", era: "late", name: "Affari regolatori", blurb: "Dossier e autorità.", cash: 120_000, sci: 18, need: ["clinica1"] },
-  { id: "stabilita", era: "late", name: "Stabilità", blurb: "Contratti premium più lunghi.", cash: 110_000, sci: 16, need: ["analitica"] },
-  { id: "licenze", era: "late", name: "Licensing", blurb: "Puoi cedere una molecola brevettata.", cash: 100_000, sci: 14, need: ["brevetti"] },
-  { id: "lancio", era: "oltre", name: "Lancio globale", blurb: "Serializzazione, GDP, tetto di quota più alto.", cash: 280_000, sci: 26, need: ["affari", "packaging"] },
-  { id: "continuo", era: "oltre", name: "Processo continuo", blurb: "L'impianto GMP chiude lotti più spesso.", cash: 320_000, sci: 28, need: ["scaleup", "classeC"] },
-  { id: "piattaforma", era: "oltre", name: "Piattaforma", blurb: "Secondo lab di scoperta e secondo farmaco.", cash: 360_000, sci: 30, need: ["lancio"] },
+  { id: "gmp", era: "early", branch: "casa", name: "GMP di base", blurb: "Apre lo spogliatoio. La qualità sale di 4.", deep: "Con gli armadietti, uno scarto è un filo più raro.", cash: 28_000, sci: 5, need: [] },
+  { id: "acquisti", era: "early", branch: "casa", name: "Ufficio acquisti", blurb: "Il magazzino si allarga. Entrano transpallet e banco accettazione.", deep: "API, solvente ed eccipiente costano il 4% in meno.", cash: 24_000, sci: 4, need: [] },
+  { id: "formazione", era: "early", branch: "casa", name: "Formazione", blurb: "Puoi far crescere l'abilità delle persone.", deep: "Formare costa il 15% in meno.", cash: 20_000, sci: 4, need: [] },
+  { id: "commerciale", era: "early", branch: "casa", name: "Sala contratti", blurb: "In direzione entra la sala. Un commerciale lì alza la paga dell'8%.", deep: "Lo stesso commerciale porta l'aumento all'11%.", cash: 30_000, sci: 5, need: ["gmp"] },
+  { id: "reattore50", era: "early", branch: "impianto", name: "Reattore 50 L", blurb: "Il pilota sale di livello e regge i contratti standard.", deep: "Il locale pilota lavora il 6% più svelto.", cash: 70_000, sci: 8, need: ["gmp"] },
+  { id: "classeC", era: "mid", branch: "impianto", name: "Classe C", blurb: "Apre il lotto produzione e l'impianto GMP.", deep: "L'impianto acceso va il 5% più svelto.", cash: 140_000, sci: 12, need: ["reattore50"] },
+  { id: "analitica", era: "mid", branch: "qualita", name: "Analitica", blurb: "HPLC, quarantena, microbiologia. La copertura sale di 8.", deep: "La copertura sale di altri 5.", cash: 90_000, sci: 12, need: ["gmp"] },
+  { id: "scaleup", era: "mid", branch: "impianto", name: "Scale-up", blurb: "Il banco arriva a 200 L. In scoperta entra il sintetizzatore.", deep: "Sull'impianto GMP uno scarto è un filo più raro.", cash: 160_000, sci: 14, need: ["reattore50", "analitica"] },
+  { id: "freddo", era: "mid", branch: "casa", name: "Catena del freddo", blurb: "Cella frigo, freezer e allarme per i flaconi.", deep: "I freezer tengono il 15% di flaconi in più.", cash: 80_000, sci: 10, need: ["gmp"] },
+  { id: "packaging", era: "mid", branch: "casa", name: "Packaging", blurb: "Confezionamento, blister e baia di carico.", deep: "Il farmaco tuo incassa il 5% in più.", cash: 60_000, sci: 8, need: ["gmp"] },
+  { id: "utilities", era: "mid", branch: "impianto", name: "Utilities", blurb: "La centralina porta i kW oltre i 6 di base.", deep: "Centralina collegata: +2 kW.", cash: 70_000, sci: 10, need: ["classeC"] },
+  { id: "scoperta", era: "mid", branch: "molecole", name: "Scoperta", blurb: "Apre il lotto scienza e il laboratorio.", deep: "Gli scienziati rendono il 12% di scienza in più.", cash: 100_000, sci: 12, need: ["gmp"] },
+  { id: "acque", era: "mid", branch: "impianto", name: "Acque", blurb: "Loop PW e WFI. Senza PW la suite non parte.", deep: "Con il WFI acceso la suite va il 5% più svelta.", cash: 90_000, sci: 12, need: ["utilities"] },
+  { id: "asettico", era: "late", branch: "impianto", name: "Processo asettico", blurb: "Apre la suite sterile e il bioreattore.", deep: "In suite, gli scarti calano.", cash: 220_000, sci: 18, need: ["classeC", "freddo", "acque"] },
+  { id: "preclinica", era: "late", branch: "molecole", name: "Preclinica", blurb: "Saggi e tossicologia. Solo quella stanza fa la preclinica.", deep: "La preclinica corre il 12% più svelta.", cash: 140_000, sci: 16, need: ["scoperta"] },
+  { id: "brevetti", era: "late", branch: "molecole", name: "Brevetti", blurb: "Banco brevetti. Con il banco, il deposito costa il 25% in meno.", deep: "Il deposito costa un altro 12% in meno.", cash: 80_000, sci: 14, need: ["scoperta"] },
+  { id: "clinica1", era: "late", branch: "molecole", name: "Clinica I", blurb: "Apre il lotto clinica e l'unità di fase I.", deep: "La fase I corre il 12% più svelta.", cash: 180_000, sci: 18, need: ["brevetti", "preclinica"] },
+  { id: "clinica2", era: "late", branch: "molecole", name: "Clinica II", blurb: "Unità di fase II e III, unit dose e monitoraggio.", deep: "La fase II corre il 10% più svelta.", cash: 200_000, sci: 20, need: ["clinica1"] },
+  { id: "clinica3", era: "late", branch: "molecole", name: "Clinica III", blurb: "Biostatistica, farmacovigilanza e archivio TMF.", deep: "Il rischio di fermarsi in clinica cala di 3 punti.", cash: 220_000, sci: 22, need: ["clinica2"] },
+  { id: "affari", era: "late", branch: "molecole", name: "Affari regolatori", blurb: "La stanza del dossier e l'invio all'autorità.", deep: "L'autorità legge una settimana in meno.", cash: 120_000, sci: 18, need: ["clinica1"] },
+  { id: "stabilita", era: "late", branch: "qualita", name: "Stabilità", blurb: "Camera climatica. I contratti di scala hanno 2 settimane in più.", deep: "Un'altra settimana, e la paga di scala sale del 4%.", cash: 110_000, sci: 16, need: ["analitica"] },
+  { id: "licenze", era: "late", branch: "molecole", name: "Licensing", blurb: "Puoi cedere una molecola già brevettata.", deep: "La cessione rende l'8% in più.", cash: 100_000, sci: 14, need: ["brevetti"] },
+  { id: "lancio", era: "oltre", branch: "molecole", name: "Lancio globale", blurb: "Serializzazione e GDP. Il tetto di quota passa a 48.", deep: "Il tetto sale a 54. Il brevetto nuovo dura 60 settimane.", cash: 280_000, sci: 26, need: ["affari", "packaging"] },
+  { id: "continuo", era: "oltre", branch: "impianto", name: "Processo continuo", blurb: "L'impianto GMP chiude i lotti più spesso.", deep: "Li chiude ancora più spesso.", cash: 320_000, sci: 28, need: ["scaleup", "classeC"] },
+  { id: "piattaforma", era: "oltre", branch: "molecole", name: "Piattaforma", blurb: "Secondo lab di scoperta e due molecole in parallelo.", deep: "Il campus produce 0,25 scienza in più a settimana.", cash: 360_000, sci: 30, need: ["lancio"] },
 ];
 
 export const ROOMS: RoomDef[] = [
@@ -342,6 +344,7 @@ export const GEAR: GearDef[] = [
 ];
 
 export const ERA_LABEL: Record<Era, string> = { early: "Inizio", mid: "Crescita", late: "Espansione", oltre: "Oltre" };
+export const BRANCH_LABEL: Record<Branch, string> = { casa: "Casa", impianto: "Impianto", qualita: "Qualità", molecole: "Molecole" };
 export const INDICATION_BOOK: { name: string; risk: number; pull: number; note: string }[] = [
   { name: "Infezioni", risk: 0.08, pull: 1.05, note: "Tanti pazienti. I trial si leggono bene." },
   { name: "Oncologia", risk: 0.16, pull: 1.28, note: "Mercato grosso. Cade più spesso." },
@@ -433,6 +436,9 @@ export function parcelAt(c: number, r: number) {
 export function hasTech(g: Game, id: TechId) {
   return g.tech.includes(id);
 }
+export function hasMastery(g: Game, id: TechId) {
+  return g.mastered?.includes(id) ?? false;
+}
 export function euro(n: number) {
   const sign = n < 0 ? "−" : "";
   const v = Math.abs(Math.round(n));
@@ -511,6 +517,7 @@ export function newGame(name: string, focus: Focus): Game {
     vials: 0,
     science: 1,
     tech: focus === "biologici" ? ["gmp"] : [],
+    mastered: [],
     autoBuy: true,
     clients: clientBook(),
     offers: [],
@@ -552,6 +559,7 @@ export function normalize(input: unknown): Game | null {
   if (!g.tiles || !g.rooms || !g.name) return null;
   g.owned ??= ["fondazione"];
   g.tech ??= [];
+  g.mastered ??= [];
   g.pipeline ??= [];
   g.products ??= [];
   g.jobs ??= [];
@@ -635,7 +643,7 @@ export function roomOnline(g: Game, room: Room) {
 export type PowerReport = { supply: number; demand: number; off: { roomId: string; index: number }[] };
 
 export function powerReport(g: Game): PowerReport {
-  let supply = 6;
+  let supply = 6 + (hasMastery(g, "utilities") && g.rooms.some((r) => r.type === "power" && r.halt === 0 && roomOnline(g, r)) ? 2 : 0);
   const loads: { roomId: string; index: number; kw: number; supply: number }[] = [];
   for (const room of g.rooms) {
     if (!roomOnline(g, room) || room.halt > 0) continue;
@@ -675,12 +683,14 @@ function itemLevel(g: Game, defId: string) {
 }
 
 export function apiPrice(g: Game) {
-  const mul = (g.mod ? g.mod.apiMul : 1) * (hasGear(g, "accettazione") ? 0.92 : 1);
+  const mul = (g.mod ? g.mod.apiMul : 1) * (hasGear(g, "accettazione") ? 0.92 : 1) * (hasMastery(g, "acquisti") ? 0.96 : 1);
   return Math.round(g.market.apiPrice * mul);
 }
 export function matPrice(g: Game, key: MatKey | "vials") {
   const mul = key === "vials" || !g.mod ? 1 : g.mod.apiMul;
-  return Math.round(MAT_PRICE[key] * mul * (key !== "vials" && hasGear(g, "accettazione") ? 0.92 : 1));
+  const desk = key !== "vials" && hasGear(g, "accettazione") ? 0.92 : 1;
+  const buy = key !== "vials" && hasMastery(g, "acquisti") ? 0.96 : 1;
+  return Math.round(MAT_PRICE[key] * mul * desk * buy);
 }
 export function demandOf(g: Game) {
   return g.market.demand + (g.mod ? g.mod.demandAdd : 0);
@@ -690,7 +700,7 @@ export function capOf(g: Game, key: MatKey | "vials") {
   if (key === "vials") {
     let n = 0;
     for (const hit of gearList(g, "freezer")) n += 18 * hit.item.level * hit.room.level;
-    return n;
+    return hasMastery(g, "freddo") ? Math.round(n * 1.15) : n;
   }
   let n = 12;
   for (const room of g.rooms.filter((r) => r.type === "warehouse")) {
@@ -924,16 +934,182 @@ export function buyParcel(g: Game, id: ParcelId) {
 export function buyTech(g: Game, id: TechId) {
   const tech = techDef(id);
   if (hasTech(g, id)) return g;
-  if (tech.need.some((n) => !hasTech(g, n))) return "Manca una tecnica precedente.";
-  if (g.science < tech.sci) return "Scienza insufficiente.";
-  if (g.cash < tech.cash) return "Cassa insufficiente.";
+  const blocked = techGate(g, id);
+  if (blocked) return blocked;
   const next = structuredClone(g) as Game;
+  heal(next);
   next.science -= tech.sci;
   next.cash -= tech.cash;
   next.tech.push(id);
   if (id === "gmp") next.quality = clamp(next.quality + 4, 0, 100);
-  pushLog(next, `Tecnica sbloccata: ${tech.name}.`, "good");
+  pushLog(next, `Tecnica firmata: ${tech.name}.`, "good");
   markGoals(next);
+  return next;
+}
+export function masteryCost(id: TechId) {
+  const tech = techDef(id);
+  return { cash: Math.round(tech.cash * 0.45), sci: Math.max(2, Math.round(tech.sci * 0.45)) };
+}
+export function techOpens(id: TechId) {
+  const out: string[] = [];
+  for (const parcel of PARCELS) if (parcel.tech === id) out.push(`Lotto ${parcel.name}`);
+  for (const room of ROOMS) if (room.tech === id) out.push(room.name);
+  for (const gear of GEAR) {
+    if (gear.tech === id) out.push(gear.name);
+    const level = gear.levelTech ? Object.entries(gear.levelTech).find(([, tech]) => tech === id) : undefined;
+    if (level) out.push(gear.id === "reattore" ? (level[0] === "2" ? "Reattore 50 L" : "Reattore 200 L") : `${gear.name} liv. ${level[0]}`);
+  }
+  return out;
+}
+function passed(g: Game, stages: Stage[]) {
+  return g.pipeline.some((p) => stages.includes(p.stage));
+}
+function proofOf(g: Game, id: TechId) {
+  const batches = g.stats.batches;
+  switch (id) {
+    case "acquisti":
+      return g.rooms.some((r) => r.type === "warehouse") ? null : "Prima posa un magazzino.";
+    case "commerciale":
+      return batches >= 1 ? null : "Chiudi prima un lotto.";
+    case "reattore50":
+      return batches >= 3 ? null : "Servono 3 lotti dal banco.";
+    case "classeC":
+      if (batches < 8) return "Servono 8 lotti consegnati.";
+      if (g.quality < 36) return "La qualità deve stare almeno a 36.";
+      return null;
+    case "analitica":
+      return g.rooms.some((r) => r.type === "qc") ? null : "Prima il laboratorio QC.";
+    case "scaleup":
+      return batches >= 12 ? null : "Servono 12 lotti, poi il 200 L.";
+    case "packaging":
+      return batches >= 4 ? null : "Consegna 4 lotti, poi confezioni.";
+    case "scoperta":
+      return batches >= 6 ? null : "Prima sei lotti. Il lab si paga con l'officina.";
+    case "acque":
+      return g.rooms.some((r) => r.type === "power") ? null : "Prima la centralina, poi il loop.";
+    case "asettico":
+      if (g.quality < 48) return "La suite vuole qualità almeno 48.";
+      if (!g.rooms.some((r) => r.type === "cold") && capOf(g, "vials") < 8) return "Prima la cella frigo, o un freezer che tenga i flaconi.";
+      return null;
+    case "preclinica":
+      return passed(g, ["lead", "preclinical", "patent", "phase1", "phase2", "phase3", "dossier", "review", "approved", "launched", "licensed"]) ? null : "Porta una molecola almeno al lead.";
+    case "brevetti":
+      return passed(g, ["preclinical", "patent", "phase1", "phase2", "phase3", "dossier", "review", "approved", "launched", "licensed"]) ? null : "Prima una molecola in preclinica.";
+    case "clinica1":
+      return passed(g, ["patent", "phase1", "phase2", "phase3", "dossier", "review", "approved", "launched", "licensed"]) ? null : "La molecola deve essere pronta per il brevetto.";
+    case "clinica2":
+      return passed(g, ["phase1", "phase2", "phase3", "dossier", "review", "approved", "launched", "licensed"]) ? null : "Prima entra in fase I.";
+    case "clinica3":
+      return passed(g, ["phase2", "phase3", "dossier", "review", "approved", "launched"]) ? null : "Prima una fase II.";
+    case "affari":
+      return passed(g, ["phase1", "phase2", "phase3", "dossier", "review", "approved", "launched", "licensed"]) ? null : "Serve una molecola già in clinica.";
+    case "stabilita":
+      if (!hasGear(g, "hplc")) return "Prima un HPLC acceso.";
+      if (g.quality < 42) return "La qualità deve stare almeno a 42.";
+      return null;
+    case "licenze":
+      return g.pipeline.some((p) => p.patented) ? null : "Prima un brevetto depositato.";
+    case "lancio":
+      return g.products.length > 0 || passed(g, ["approved", "launched"]) ? null : "Prima un'approvazione.";
+    case "continuo":
+      if (!g.rooms.some((r) => r.type === "plant")) return "Prima l'impianto GMP.";
+      if (batches < 18) return "L'impianto deve aver visto 18 lotti.";
+      return null;
+    case "piattaforma":
+      return g.stats.launches + g.stats.licenses >= 1 ? null : "Prima un lancio o una cessione.";
+    default:
+      return null;
+  }
+}
+export function techGate(g: Game, id: TechId) {
+  if (hasTech(g, id)) return null;
+  const tech = techDef(id);
+  const missing = tech.need.find((n) => !hasTech(g, n));
+  if (missing) return `Prima ${techDef(missing).name}.`;
+  const proof = proofOf(g, id);
+  if (proof) return proof;
+  if (g.science < tech.sci) return `Mancano ${Math.ceil(tech.sci - g.science)} scienza.`;
+  if (g.cash < tech.cash) return "Cassa insufficiente.";
+  return null;
+}
+function useOf(g: Game, id: TechId) {
+  switch (id) {
+    case "gmp":
+      return g.rooms.some((r) => r.type === "gown" && r.slots.some((s) => s.item?.defId === "armadietti")) ? null : "Metti gli armadietti nello spogliatoio.";
+    case "acquisti":
+      return hasGear(g, "transpallet") || hasGear(g, "accettazione") ? null : "Compra il transpallet o il banco accettazione.";
+    case "formazione":
+      return g.staff.some((s) => s.skill >= 4) ? null : "Forma qualcuno almeno ad abilità 4.";
+    case "commerciale":
+      return sellerOn(g) ? null : "Metti un commerciale in sala, in direzione.";
+    case "reattore50":
+      return itemLevel(g, "reattore") >= 2 ? null : "Porta il reattore da banco a 50 L.";
+    case "classeC":
+      return hasGear(g, "reattore-gmp") ? null : "Accendi il reattore GMP.";
+    case "analitica":
+      return hasGear(g, "hplc") ? null : "Accendi un HPLC.";
+    case "scaleup":
+      return itemLevel(g, "reattore") >= 3 || hasGear(g, "sintetizzatore") ? null : "Il 200 L, o il sintetizzatore in scoperta.";
+    case "freddo":
+      return hasGear(g, "freezer") ? null : "Accendi un freezer.";
+    case "packaging":
+      return hasGear(g, "blister") || hasGear(g, "baia") ? null : "Blisteratrice o baia di carico.";
+    case "utilities":
+      return hasGear(g, "trasformatore") || hasGear(g, "generatore") ? null : "Trasformatore o gruppo elettrogeno.";
+    case "scoperta":
+      return hasGear(g, "banco") || hasGear(g, "lcms") ? null : "Banco chimico o LC-MS.";
+    case "acque":
+      return hasGear(g, "pw") ? null : "Accendi il loop PW.";
+    case "asettico":
+      return hasGear(g, "bioreattore") ? null : "Accendi il bioreattore.";
+    case "preclinica":
+      return hasGear(g, "saggi") ? null : "Accendi la piattaforma saggi.";
+    case "brevetti":
+      return hasGear(g, "brevetti-desk") ? null : "Metti il banco brevetti.";
+    case "clinica1":
+      return g.rooms.some((r) => r.type === "phase1") ? null : "Posa l'unità di fase I.";
+    case "clinica2":
+      return g.rooms.some((r) => r.type === "phase23") ? null : "Posa l'unità di fase II e III.";
+    case "clinica3":
+      return hasGear(g, "tmf") || hasGear(g, "biostat") ? null : "Archivio TMF o biostatistica.";
+    case "affari":
+      return hasGear(g, "dossier") ? null : "Metti l'archivio dossier.";
+    case "stabilita":
+      return hasGear(g, "climatica") ? null : "Accendi la camera climatica.";
+    case "licenze":
+      return g.stats.licenses >= 1 ? null : "Cedi prima una molecola.";
+    case "lancio":
+      return g.stats.launches >= 1 ? null : "Metti prima un farmaco in commercio.";
+    case "continuo":
+      return g.stats.batches >= 24 && g.rooms.some((r) => r.type === "plant") ? null : "Servono 24 lotti e l'impianto acceso.";
+    case "piattaforma":
+      return g.rooms.filter((r) => r.type === "discovery").length >= 2 || g.stats.launches + g.stats.licenses >= 2 ? null : "Il secondo lab, o un secondo farmaco uscito.";
+    default:
+      return null;
+  }
+}
+export function masteryGate(g: Game, id: TechId) {
+  if (!hasTech(g, id)) return "Prima firma la tecnica.";
+  if (hasMastery(g, id)) return null;
+  const use = useOf(g, id);
+  if (use) return use;
+  const cost = masteryCost(id);
+  if (g.science < cost.sci) return `Mancano ${Math.ceil(cost.sci - g.science)} scienza.`;
+  if (g.cash < cost.cash) return "Cassa insufficiente.";
+  return null;
+}
+export function masterTech(g: Game, id: TechId) {
+  if (hasMastery(g, id)) return g;
+  const blocked = masteryGate(g, id);
+  if (blocked) return blocked;
+  const tech = techDef(id);
+  const cost = masteryCost(id);
+  const next = structuredClone(g) as Game;
+  heal(next);
+  next.science -= cost.sci;
+  next.cash -= cost.cash;
+  next.mastered.push(id);
+  pushLog(next, `Tecnica approfondita: ${tech.name}.`, "good");
   return next;
 }
 
@@ -972,13 +1148,16 @@ export function assign(g: Game, staffId: string, roomId: string | null) {
   markGoals(next);
   return next;
 }
+export function trainCost(g: Game, skill: number) {
+  return Math.round((18_000 + skill * 8_000) * (hasMastery(g, "formazione") ? 0.85 : 1));
+}
 export function train(g: Game, id: string) {
   if (!hasTech(g, "formazione")) return "Prima la tecnica Formazione.";
   const next = structuredClone(g) as Game;
   const member = next.staff.find((s) => s.id === id);
   if (!member) return g;
   if (member.skill >= 6) return "È già al massimo.";
-  const cost = 18_000 + member.skill * 8_000;
+  const cost = trainCost(next, member.skill);
   if (next.cash < cost) return "Cassa insufficiente.";
   next.cash -= cost;
   member.skill += 1;
@@ -1029,6 +1208,7 @@ function lineOf(g: Game, room: Room) {
     const m = lv("reattore");
     let vel = 0.7 * (0.6 + 0.2 * m) * (0.85 + 0.05 * room.level);
     if (on("filtro-pilota")) vel *= 1.08;
+    if (hasMastery(g, "reattore50")) vel *= 1.06;
     return { room, kind: "pilot" as const, vel, m };
   }
   if (room.type === "plant" && on("reattore-gmp")) {
@@ -1037,7 +1217,8 @@ function lineOf(g: Game, room: Room) {
     let vel = 1 * (0.55 + 0.15 * m) * (0.85 + 0.05 * room.level);
     if (on("filtro")) vel *= 1.12;
     if (on("riempimento")) vel *= 1.15;
-    if (hasTech(g, "continuo")) vel += 0.25;
+    if (hasTech(g, "continuo")) vel += hasMastery(g, "continuo") ? 0.36 : 0.25;
+    if (hasMastery(g, "classeC")) vel *= 1.05;
     return { room, kind: "plant" as const, vel, m, fill: on("riempimento") };
   }
   if (room.type === "sterile" && on("bioreattore")) {
@@ -1046,6 +1227,7 @@ function lineOf(g: Game, room: Room) {
     let vel = 0.62 * (0.6 + 0.13 * m) * (0.85 + 0.05 * room.level);
     vel *= on("isolatore") ? 1 : 0.5;
     if (itemOn(g, "wfi")) vel *= 1.1;
+    if (hasMastery(g, "acque") && itemOn(g, "wfi")) vel *= 1.05;
     return { room, kind: "sterile" as const, vel, m };
   }
   return null;
@@ -1088,6 +1270,8 @@ function patchJob(g: Game, j: Job) {
   j.done ??= 0;
 }
 function heal(g: Game) {
+  g.mastered ??= [];
+  g.mastered = g.mastered.filter((id) => g.tech.includes(id));
   if (!Array.isArray(g.clients) || g.clients.length === 0) g.clients = clientBook();
   else for (const seed of clientBook()) if (!g.clients.some((c) => c.id === seed.id)) g.clients.push(seed);
   for (const offer of g.offers) patchOffer(offer);
@@ -1146,8 +1330,9 @@ function pushOffer(g: Game, fixed?: { client: Client; tier: Tier; shape: Shape; 
   if (tier === "sterile") batches = 2;
   const payEach = tier === "pilota" ? 130_000 : tier === "standard" ? 155_000 : tier === "premium" ? 200_000 : 240_000;
   const shapeMul = shape === "trasferimento" ? 0.7 : shape === "fornitura" ? 1.06 : 1;
+  const scale = tier === "premium" && hasMastery(g, "stabilita") ? 1.04 : 1;
   const clauses: Clauses = shape === "urgenza" ? { rush: true, tight: false, penalty: true } : { rush: false, tight: false, penalty: false };
-  const basePay = Math.round(batches * payEach * shapeMul * trustMul(client.trust) * (fixed?.payMul ?? 1));
+  const basePay = Math.round(batches * payEach * shapeMul * trustMul(client.trust) * (fixed?.payMul ?? 1) * scale);
   const baseQuality = tier === "pilota" ? 46 : tier === "standard" ? 58 : tier === "premium" ? 70 : 74;
   g.offers.push({
     id: nid(g, "o"),
@@ -1166,7 +1351,7 @@ function pushOffer(g: Game, fixed?: { client: Client; tier: Tier; shape: Shape; 
     baseQuality,
     quality: baseQuality,
     expires: g.week + (shape === "urgenza" ? 4 : 6),
-    dueWeeks: spanWeeks(shape, batches, clauses.rush),
+    dueWeeks: spanWeeks(shape, batches, clauses.rush) + (tier === "premium" && hasTech(g, "stabilita") ? (hasMastery(g, "stabilita") ? 3 : 2) : 0),
     clauses,
     blurb: BLURB[shape],
     science: shape === "trasferimento" ? 3 : 0,
@@ -1279,6 +1464,7 @@ export function coverage(g: Game) {
   score += 5 * itemLevel(g, "micro");
   if (hasGear(g, "climatica")) score += 6;
   if (hasTech(g, "analitica")) score += 8;
+  if (hasMastery(g, "analitica")) score += 5;
   if (hasGear(g, "ipc")) score += 3;
   if (hasGear(g, "registro")) score += 2;
   if (!hasGear(g, "gabbia")) score -= 4;
@@ -1359,6 +1545,9 @@ function produce(g: Game) {
       if (job.tier === "sterile" && !itemOn(g, "isolatore")) fail += 0.1;
       if (job.tier === "sterile" && !hasGear(g, "micro")) fail += 0.06;
       if (room.slots.some((s) => s.item?.defId === "cip" && gearOn(g, room.id, room.slots.indexOf(s)))) fail -= 0.04;
+      if (hasMastery(g, "gmp") && gownOk(g)) fail -= 0.01;
+      if (line.kind === "plant" && hasMastery(g, "scaleup")) fail -= 0.01;
+      if (line.kind === "sterile" && hasMastery(g, "asettico")) fail -= 0.02;
       fail = clamp(fail, 0.02, 0.45);
       if (roll(g.week * 17 + job.done + g.seq) < fail) {
         job.scrap += 1;
@@ -1378,7 +1567,7 @@ function produce(g: Game) {
         let slice = Math.round(job.pay / job.batches);
         if (blister) slice = Math.round(slice * (1 + 0.05 * blister));
         if (hasGear(g, "astuccio")) slice = Math.round(slice * 1.06);
-        if (commercial) slice = Math.round(slice * 1.08);
+        if (commercial) slice = Math.round(slice * (hasMastery(g, "commerciale") ? 1.11 : 1.08));
         if (line.kind === "plant" && !("fill" in line && line.fill)) slice = Math.round(slice * 0.9);
         g.cash += slice;
         g.stats.revenue += slice;
@@ -1416,6 +1605,8 @@ export function scienceRate(g: Game) {
     if (!room) n += 0.4;
     else if (room.type === "discovery" && roomOnline(g, room) && room.halt === 0) n += 0.35 * s.skill * itemLevel(g, "lcms");
   }
+  if (hasMastery(g, "scoperta")) n *= 1.12;
+  if (hasMastery(g, "piattaforma")) n += 0.25;
   return n;
 }
 function indicationOf(name: string) {
@@ -1430,20 +1621,24 @@ export function trialRisk(g: Game, program: Program) {
   let chance = base + indicationOf(program.indication).risk * 0.45 - g.quality / 500;
   if (hasGear(g, "biostat")) chance -= 0.06;
   if ((program.heat ?? 0) >= 3) chance += 0.04;
+  if (hasMastery(g, "clinica3")) chance -= 0.03;
   return clamp(chance, 0.03, 0.5);
 }
-export function licenseValue(program: Program) {
+export function licenseValue(program: Program, g?: Game) {
   const bonus = program.stage === "phase3" ? 700_000 : program.stage === "phase2" ? 380_000 : program.stage === "phase1" ? 180_000 : 0;
   const rare = program.indication === "Malattie rare" ? 1.2 : 1;
   const bio = (program.modality ?? "chimica") === "biologico" ? 1.12 : 1;
   const heat = 1 - 0.08 * (program.heat ?? 0);
-  return Math.round((420_000 + bonus) * marketMul(program) * rare * bio * heat);
+  const deep = g && hasMastery(g, "licenze") ? 1.08 : 1;
+  return Math.round((420_000 + bonus) * marketMul(program) * rare * bio * heat * deep);
 }
 export function researchCost(g: Game, program: Program) {
   const step = NEXT_STAGE[program.stage];
   if (!step) return 0;
-  if (program.stage === "patent" && hasGear(g, "brevetti-desk")) return Math.round(step.cost * 0.75);
-  return step.cost;
+  let cost = step.cost;
+  if (program.stage === "patent" && hasGear(g, "brevetti-desk")) cost = Math.round(cost * 0.75);
+  if (program.stage === "patent" && hasMastery(g, "brevetti")) cost = Math.round(cost * 0.88);
+  return cost;
 }
 export function researchGate(g: Game, program: Program): string | null {
   if (!program.waiting) return null;
@@ -1502,6 +1697,7 @@ export function labPace(g: Game, program: Program): { speed: number; need: numbe
     else if (!s) block = "Metti uno scienziato in preclinica.";
     else if (!hasGear(g, "saggi")) block = "Manca la piattaforma saggi.";
     else speed = 0.4 * (0.6 + 0.2 * itemLevel(g, "saggi")) * (hasGear(g, "toss") ? 1.25 : 0.8) * (s / 3);
+    if (speed > 0 && hasMastery(g, "preclinica")) speed *= 1.12;
   } else if (program.stage === "phase1") {
     const home = g.rooms.find((r) => r.type === "phase1");
     const s = staffSkill(g, "clinical", "phase1");
@@ -1509,6 +1705,7 @@ export function labPace(g: Game, program: Program): { speed: number; need: numbe
     else if (!s) block = "Metti un clinico in fase I.";
     else if (!hasGear(g, "pharmacy") || !hasGear(g, "letti")) block = "Servono pharmacy e unità letti.";
     else speed = (0.5 + 0.15 * itemLevel(g, "monitor-1") + 0.1 * home.level) * (s / 4);
+    if (speed > 0 && hasMastery(g, "clinica1")) speed *= 1.12;
   } else if (program.stage === "phase2" || program.stage === "phase3") {
     const home = g.rooms.find((r) => r.type === "phase23");
     const s = staffSkill(g, "clinical", "phase23");
@@ -1517,6 +1714,7 @@ export function labPace(g: Game, program: Program): { speed: number; need: numbe
     else if (!hasGear(g, "unitdose")) block = "Manca l'unit dose.";
     else if (program.stage === "phase3" && !hasGear(g, "tmf")) block = "La fase III vuole l'archivio TMF.";
     else speed = (0.5 + 0.15 * itemLevel(g, "monitor-2") + 0.1 * home.level) * (s / 4);
+    if (speed > 0 && program.stage === "phase2" && hasMastery(g, "clinica2")) speed *= 1.1;
   } else if (program.stage === "dossier") {
     const s = staffSkill(g, "regulatory", "regulatory");
     if (!g.rooms.some((r) => r.type === "regulatory")) block = "Mancano gli affari regolatori.";
@@ -1652,7 +1850,7 @@ export function advanceProgram(g: Game, id: string, authorityId?: string) {
     program.progress = 0;
     program.authority = authority.name;
     const staffed = next.staff.some((s) => s.role === "regulatory" && s.roomId);
-    const cut = (staffed ? 2 : 0) + (itemLevel(next, "dossier") >= 2 ? 2 : 0);
+    const cut = (staffed ? 2 : 0) + (itemLevel(next, "dossier") >= 2 ? 2 : 0) + (hasMastery(next, "affari") ? 1 : 0);
     program.reviewLeft = Math.max(3, authority.weeks - cut);
     pushLog(next, `${program.code} è da ${authority.name}.`, "info");
     return next;
@@ -1688,7 +1886,7 @@ export function licenseOut(g: Game, id: string) {
   const next = structuredClone(g) as Game;
   const program = next.pipeline.find((p) => p.id === id);
   if (!program?.patented || ["failed", "launched", "licensed", "approved"].includes(program.stage)) return "Si cede solo una molecola brevettata ancora in sviluppo.";
-  const pay = licenseValue(program);
+  const pay = licenseValue(program, next);
   program.stage = "licensed";
   program.waiting = false;
   next.cash += pay;
@@ -1705,7 +1903,7 @@ export function launchProduct(g: Game, id: string) {
   const program = next.pipeline.find((p) => p.id === id);
   if (!program || program.stage !== "approved") return g;
   program.stage = "launched";
-  next.products.push({ id: nid(next, "d"), code: program.code, indication: program.indication, price: 100, patented: program.patented, patentLeft: program.patented ? 48 : 0 });
+  next.products.push({ id: nid(next, "d"), code: program.code, indication: program.indication, price: 100, patented: program.patented, patentLeft: program.patented ? (hasMastery(next, "lancio") ? 60 : 48) : 0 });
   const bump = Math.max(4, Math.round((hasTech(next, "lancio") ? 10 : 7) * marketMul(program)));
   next.playerShare = clamp(next.playerShare + bump, 0, shareCap(next));
   next.stats.launches += 1;
@@ -1715,7 +1913,8 @@ export function launchProduct(g: Game, id: string) {
   return next;
 }
 function shareCap(g: Game) {
-  return hasTech(g, "lancio") ? 48 : 34;
+  if (!hasTech(g, "lancio")) return 34;
+  return hasMastery(g, "lancio") ? 54 : 48;
 }
 export function setPrice(g: Game, id: string, price: number) {
   const next = structuredClone(g) as Game;
@@ -1728,7 +1927,7 @@ export function setPrice(g: Game, id: string, price: number) {
 function commerce(g: Game) {
   if (!g.products.length) return;
   const cap = shareCap(g);
-  const ship = hasGear(g, "baia") ? 1 : 0.75;
+  const ship = (hasGear(g, "baia") ? 1 : 0.75) * (hasMastery(g, "packaging") ? 1.05 : 1);
   const serialOk = hasGear(g, "serial") ? 1 : 0.9;
   let drift = 0;
   for (const product of g.products) {

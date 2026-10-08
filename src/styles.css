@@ -74,6 +74,25 @@
   box-shadow: 0 10px 22px rgba(18, 38, 44, 0.06);
 }
 
+.blueprint {
+  background:
+    linear-gradient(rgba(27, 122, 100, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(27, 122, 100, 0.08) 1px, transparent 1px),
+    linear-gradient(#f3f7f8, #e4eef1);
+  background-size: 16px 16px, 16px 16px, auto;
+  border: 1px solid #c5d5da;
+  border-radius: 1.15rem;
+  box-shadow: 0 10px 22px rgba(18, 38, 44, 0.06);
+}
+
+.blueprint.in {
+  box-shadow: inset 5px 0 0 #1b7a64, 0 10px 22px rgba(18, 38, 44, 0.06);
+}
+
+.blueprint.deep {
+  box-shadow: inset 5px 0 0 #12262c, 0 10px 22px rgba(18, 38, 44, 0.06);
+}
+
 .dossier {
   background:
     radial-gradient(160px 90px at 100% 0%, rgba(200, 136, 18, 0.22), transparent 62%),

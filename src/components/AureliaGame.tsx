@@ -4,6 +4,7 @@ import { blip, unlockAudio } from "@/tycoon/audio";
 import { drawCampus, fitZoom, pickSign, pickTile, cameraBounds, type Cam } from "@/tycoon/draw";
 import {
   AUTHORITIES,
+  BRANCH_LABEL,
   ERA_LABEL,
   GEAR,
   GOAL_TEXT,
@@ -38,6 +39,7 @@ import {
   gearDef,
   gearOn,
   hasGear,
+  hasMastery,
   hasTech,
   hire,
   installGear,
@@ -45,6 +47,9 @@ import {
   launchProduct,
   licenseOut,
   licenseValue,
+  masterTech,
+  masteryCost,
+  masteryGate,
   matPrice,
   newGame,
   orderMat,
@@ -70,9 +75,12 @@ import {
   staffIn,
   startProgram,
   techDef,
+  techGate,
+  techOpens,
   TIER_LABEL,
   tick,
   train,
+  trainCost,
   trialRisk,
   tuneOffer,
   upgradeGear,
@@ -80,6 +88,7 @@ import {
   upgradeRoomCost,
   waitingProgram,
   yearOf,
+  type Branch,
   type Focus,
   type Game,
   type Job,
@@ -90,7 +99,6 @@ import {
   type Program,
   type RoomType,
   type Stage,
-  type TechId,
 } from "@/tycoon/model";
 import { clearGame, loadGame, saveGame } from "@/tycoon/save";
 
@@ -388,7 +396,7 @@ export function AureliaGame() {
         <Nav icon={<MapIcon />} label="Mappa" on={tab === "map"} click={() => setTab("map")} />
         <Nav icon={<ScrollText />} label="Contratti" on={tab === "deals"} click={() => setTab("deals")} dot={game.offers.length > 0} />
         <Nav icon={<FlaskConical />} label="Ricerca" on={tab === "research"} click={() => setTab("research")} dot={game.pipeline.some((item) => item.waiting)} />
-        <Nav icon={<GitBranch />} label="Tecniche" on={tab === "tech"} click={() => setTab("tech")} />
+        <Nav icon={<GitBranch />} label="Tecniche" on={tab === "tech"} click={() => setTab("tech")} dot={TECH.some((tech) => !hasTech(game, tech.id) && !techGate(game, tech.id))} />
         <Nav icon={<Users />} label="Persone" on={tab === "team"} click={() => setTab("team")} />
         <Nav icon={<Globe2 />} label="Mondo" on={tab === "world"} click={() => setTab("world")} />
       </nav>
@@ -967,36 +975,83 @@ function StudyPage({ game, program, apply }: { game: Game; program: Program; app
         <button type="button" className="mt-3 min-h-11 w-full rounded-full bg-card text-sm" onClick={() => apply(pushScience(game, program.id))}>Spingi con 4 scienza</button>
       ) : null}
       {program.patented && !["failed", "launched", "licensed", "approved"].includes(program.stage) ? (
-        <button type="button" className="mt-2 min-h-11 w-full rounded-full bg-paper text-sm" onClick={() => apply(licenseOut(game, program.id))}>Cedi · {euro(licenseValue(program))}</button>
+        <button type="button" className="mt-2 min-h-11 w-full rounded-full bg-paper text-sm" onClick={() => apply(licenseOut(game, program.id))}>Cedi · {euro(licenseValue(program, game))}</button>
       ) : null}
     </article>
   );
 }
 
 function TechTree({ game, apply }: { game: Game; apply: (g: Game | string) => void }) {
-  const eras = ["early", "mid", "late", "oltre"] as const;
+  const branches = ["casa", "impianto", "qualita", "molecole"] as const;
+  const [branch, setBranch] = useState<Branch>("casa");
+  const rate = scienceRate(game);
+  const ready = (id: Branch) => TECH.filter((tech) => tech.branch === id && !hasTech(game, tech.id) && !techGate(game, tech.id)).length;
+  const list = TECH.filter((tech) => tech.branch === branch);
   return (
-    <div className="mx-auto grid max-w-lg gap-4">
-      <h2 className="font-display text-3xl">Tecniche</h2>
-      <p className="text-sm text-mist">Scienza {Math.floor(game.science)}. Gli scienziati la producono anche in panchina.</p>
-      {eras.map((era) => (
-        <section key={era} className="grid gap-2">
-          <h3 className="font-display text-2xl">{ERA_LABEL[era]}</h3>
-          {TECH.filter((tech) => tech.era === era).map((tech) => {
-            const owned = hasTech(game, tech.id as TechId);
-            return (
-              <article key={tech.id} className="rounded-xl border border-line bg-card p-3">
-                <p className="font-medium">{tech.name}</p>
-                <p className="text-sm text-mist">{tech.blurb}</p>
-                <p className="mt-1 text-sm">{owned ? "In casa" : `${euro(tech.cash)} · scienza ${tech.sci}`}{tech.need.length ? ` · prima ${tech.need.map((id) => TECH.find((t) => t.id === id)?.name).join(", ")}` : ""}</p>
-                {owned ? null : (
-                  <button type="button" className="mt-2 min-h-11 w-full rounded-full bg-teal text-card" onClick={() => apply(buyTech(game, tech.id))}>Sblocca</button>
-                )}
-              </article>
-            );
-          })}
-        </section>
-      ))}
+    <div className="mx-auto grid max-w-lg gap-3">
+      <header className="blueprint px-4 py-3">
+        <p className="text-[11px] tracking-widest text-mist uppercase">Fascicolo di sito</p>
+        <h2 className="font-display text-3xl">Tecniche</h2>
+        <p className="text-sm text-mist">
+          Scienza {Math.floor(game.science)} · entra {rate.toFixed(1).replace(".", ",")}/sett. · {game.tech.length} di {TECH.length} in casa
+        </p>
+      </header>
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {branches.map((id) => {
+          const n = ready(id);
+          return (
+            <button key={id} type="button" onClick={() => setBranch(id)} className={`min-h-11 shrink-0 rounded-full px-3 text-sm ${branch === id ? "bg-ink text-card" : "bg-card text-ink"}`}>
+              {BRANCH_LABEL[id]}{n ? ` · ${n}` : ""}
+            </button>
+          );
+        })}
+      </div>
+      {list.map((tech) => {
+        const owned = hasTech(game, tech.id);
+        const deep = hasMastery(game, tech.id);
+        const gate = owned ? null : techGate(game, tech.id);
+        const again = owned && !deep ? masteryGate(game, tech.id) : null;
+        const cost = masteryCost(tech.id);
+        const opens = techOpens(tech.id);
+        const stamp = deep ? "FONDO" : owned ? "CASA" : gate ? "CHIUSA" : "PRONTA";
+        const ink = deep ? "#12262c" : owned ? "#1b7a64" : gate ? "#8aa0a6" : "#c88812";
+        return (
+          <article key={tech.id} className={`blueprint px-3 py-3 ${deep ? "deep" : owned ? "in" : ""}`}>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="text-[11px] tracking-wide text-mist uppercase">{ERA_LABEL[tech.era]}</p>
+                <h3 className="font-display text-2xl leading-tight">{tech.name}</h3>
+              </div>
+              <span className="seal sm shrink-0" style={{ background: ink }}>{stamp}</span>
+            </div>
+            <p className="mt-2 text-sm">{tech.blurb}</p>
+            <p className="mt-1 text-sm text-mist">{deep ? tech.deep : `Se la approfondisci: ${tech.deep}`}</p>
+            {opens.length ? (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {opens.slice(0, 6).map((name) => (
+                  <span key={name} className="rounded-full bg-card px-2 py-1 text-xs">{name}</span>
+                ))}
+                {opens.length > 6 ? <span className="rounded-full bg-card px-2 py-1 text-xs text-mist">+{opens.length - 6}</span> : null}
+              </div>
+            ) : null}
+            {tech.need.length ? (
+              <p className="mt-2 text-xs text-mist">Dopo {tech.need.map((id) => TECH.find((item) => item.id === id)?.name).join(" e ")}.</p>
+            ) : null}
+            {!owned && gate ? <p className="mt-2 text-sm text-amber">{gate}</p> : null}
+            {!owned && !gate ? (
+              <button type="button" className="mt-3 min-h-12 w-full rounded-full bg-teal font-semibold text-card" onClick={() => apply(buyTech(game, tech.id))}>
+                Firma · {euro(tech.cash)} · scienza {tech.sci}
+              </button>
+            ) : null}
+            {owned && !deep && again ? <p className="mt-2 text-sm text-amber">{again}</p> : null}
+            {owned && !deep && !again ? (
+              <button type="button" className="mt-3 min-h-12 w-full rounded-full bg-ink font-semibold text-card" onClick={() => apply(masterTech(game, tech.id))}>
+                Approfondisci · {euro(cost.cash)} · scienza {cost.sci}
+              </button>
+            ) : null}
+          </article>
+        );
+      })}
     </div>
   );
 }
@@ -1018,7 +1073,7 @@ function Team({ game, apply }: { game: Game; apply: (g: Game | string) => void }
             </div>
             {person.skill < 6 ? (
               <button type="button" className="mt-2 min-h-11 w-full rounded-full bg-paper text-sm" onClick={() => apply(train(game, person.id))}>
-                Forma · {euro(18_000 + person.skill * 8_000)}
+                Forma · {euro(trainCost(game, person.skill))}
               </button>
             ) : null}
           </article>
