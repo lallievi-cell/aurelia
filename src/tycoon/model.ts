@@ -87,7 +87,8 @@ export type Room = {
   slots: ({ item: Gear | null })[];
 };
 export type Tile = { corridor: boolean; roomId: string | null; ground: "lot" | "garden" };
-export type Staff = { id: string; name: string; role: Role; skill: number; salary: number; roomId: string | null };
+export type Trait = "preciso" | "svelto" | "curioso" | "calmo" | "chiaro" | "negoziatore";
+export type Staff = { id: string; name: string; role: Role; skill: number; salary: number; roomId: string | null; trait: Trait; leave: number };
 export type Client = { id: string; name: string; trust: number; taste: Tier; note: string; last: number };
 export type Offer = {
   id: string;
@@ -224,6 +225,30 @@ export const ROLE_LABEL: Record<Role, string> = {
   clinical: "Clinica",
   regulatory: "Regolatorio",
   commercial: "Commerciale",
+};
+export const TRAIT_LABEL: Record<Trait, string> = {
+  preciso: "Preciso",
+  svelto: "Svelto",
+  curioso: "Curioso",
+  calmo: "Calmo",
+  chiaro: "Chiaro",
+  negoziatore: "Negoziatore",
+};
+export const TRAIT_NOTE: Record<Trait, string> = {
+  preciso: "Meno scarti, in linea o in QC.",
+  svelto: "La sua linea va un filo più svelta.",
+  curioso: "Più scienza, e la scoperta corre.",
+  calmo: "La qualità sale di più. I trial sono un filo più sicuri.",
+  chiaro: "Dossier e autorità vanno più lisci.",
+  negoziatore: "I lotti pagano di più, e la casa si fida.",
+};
+const TRAIT_FOR: Record<Role, Trait[]> = {
+  operator: ["preciso", "svelto"],
+  scientist: ["curioso", "preciso"],
+  qa: ["calmo", "preciso"],
+  clinical: ["calmo", "chiaro"],
+  regulatory: ["chiaro", "preciso"],
+  commercial: ["negoziatore", "chiaro"],
 };
 
 export const PARCELS: { id: ParcelId; name: string; c0: number; r0: number; c1: number; r1: number; cost: number; tech: TechId | null; needBatch: boolean; touch: ParcelId[] }[] = [
@@ -474,15 +499,22 @@ export function anchorTiles(room: Room) {
   return roomTiles(room).slice(0, anchorsOf(room));
 }
 
-function person(g: Game, role: Role, skill: number): Staff {
+function traitFor(role: Role, salt: number): Trait {
+  const pool = TRAIT_FOR[role];
+  return pool[Math.floor(roll(salt) * pool.length)]!;
+}
+function person(g: Game, role: Role, skill: number, leave = 0): Staff {
   const base: Record<Role, number> = { scientist: 9000, operator: 6200, qa: 7000, clinical: 8500, regulatory: 8000, commercial: 7500 };
+  const id = nid(g, "p");
   return {
-    id: nid(g, "p"),
+    id,
     name: `${FIRST[Math.floor(roll(g.seq + 3) * FIRST.length)]} ${LAST[Math.floor(roll(g.seq + 9) * LAST.length)]}`,
     role,
     skill,
     salary: Math.round(base[role] * (0.84 + skill * 0.07)),
     roomId: null,
+    trait: traitFor(role, g.seq + skill * 5),
+    leave,
   };
 }
 
@@ -545,7 +577,7 @@ export function newGame(name: string, focus: Focus): Game {
   for (const t of roomTiles(hq)) g.tiles[t.r]![t.c]!.roomId = hq.id;
   for (const [c, r] of [[3, 1], [3, 2], [4, 2]] as const) g.tiles[r]![c]!.corridor = true;
   g.staff.push(person(g, "scientist", 3), person(g, "operator", 3));
-  g.candidates.push(person(g, "qa", 3), person(g, "operator", 4), person(g, "commercial", 2));
+  g.candidates.push(person(g, "qa", 3, 7), person(g, "operator", 4, 8), person(g, "commercial", 2, 9));
   pushLog(g, `${g.name} ha solo il lotto fondazione. Allunga il corridoio, poi magazzino e pilota.`, "info");
   refreshOffers(g, true);
   return g;
@@ -1113,14 +1145,29 @@ export function masterTech(g: Game, id: TechId) {
   return next;
 }
 
+export function headroom(g: Game) {
+  const hq = g.rooms.find((r) => r.type === "hq");
+  return 4 + (hq?.level ?? 1) * 3;
+}
+export function hireCost(skill: number) {
+  return 8_000 + skill * 6_000;
+}
+export function payroll(g: Game) {
+  return g.staff.reduce((sum, member) => sum + member.salary, 0);
+}
 export function hire(g: Game, id: string) {
   const next = structuredClone(g) as Game;
+  heal(next);
   const idx = next.candidates.findIndex((c) => c.id === id);
-  if (idx < 0 || next.cash < 12_000) return g;
+  if (idx < 0) return g;
+  if (next.staff.length >= headroom(next)) return "La direzione non regge altre persone. Alza il suo livello.";
+  const cost = hireCost(next.candidates[idx]!.skill);
+  if (next.cash < cost) return "Cassa insufficiente.";
   const hired = next.candidates.splice(idx, 1)[0]!;
-  next.cash -= 12_000;
+  hired.leave = 0;
+  next.cash -= cost;
   next.staff.push(hired);
-  pushLog(next, `${hired.name} entra.`, "good");
+  pushLog(next, `${hired.name} entra. ${TRAIT_LABEL[hired.trait]}.`, "good");
   return next;
 }
 export function dismiss(g: Game, id: string) {
@@ -1166,6 +1213,56 @@ export function train(g: Game, id: string) {
   return next;
 }
 
+export function seatsFor(g: Game, member: Staff) {
+  const rooms = g.rooms.filter((room) => roomDef(room.type).role === member.role);
+  return rooms.map((room) => {
+    const siblings = rooms.filter((other) => other.type === room.type);
+    const index = siblings.findIndex((other) => other.id === room.id);
+    const base = roomDef(room.type).name;
+    const name = siblings.length > 1 ? `${base} ${index + 1}` : base;
+    const used = staffIn(g, room.id).length;
+    const cap = slotsFor(room);
+    const here = member.roomId === room.id;
+    return { id: room.id, name, open: here || used < cap, here, used, cap };
+  });
+}
+export function dutyOf(g: Game, member: Staff) {
+  if (!member.roomId) {
+    const bench: Record<Role, string> = {
+      operator: "In panchina. Senza un operatore la linea non parte.",
+      scientist: "In panchina. Rende poca scienza, il laboratorio è fermo.",
+      qa: "In panchina. Il QC non alza la qualità.",
+      commercial: "In panchina. I contratti non prendono il premio.",
+      clinical: "In panchina. Le fasi cliniche non avanzano.",
+      regulatory: "In panchina. Il dossier non si scrive.",
+    };
+    return bench[member.role];
+  }
+  const room = g.rooms.find((item) => item.id === member.roomId);
+  if (!room) return "In panchina.";
+  const name = roomDef(room.type).name;
+  if (member.role === "operator") {
+    const only = staffIn(g, room.id, "operator").length === 1;
+    const job = g.jobs.find((item) => item.roomId === room.id && item.status === "active");
+    if (only && job) return `Tiene ${name}. Se esce, il lotto di ${job.client} si ferma.`;
+    return `Tiene ${name}. L'abilità muove i lotti: al 3 è normale, al 6 è più svelta.`;
+  }
+  if (member.role === "scientist") return room.type === "discovery" || room.type === "preclinical" ? `Lavora in ${name}. Più è abile, più la pagina avanza.` : `È in ${name}, ma qui la ricerca non cammina.`;
+  if (member.role === "qa") return room.type === "qc" || room.type === "stability" ? `In ${name}. Ogni settimana la qualità sale con l'abilità.` : `È in ${name}.`;
+  if (member.role === "commercial") return hasGear(g, "sala") ? "In sala. L'abilità alza la paga di ogni lotto." : "In direzione, ma manca la sala contratti.";
+  if (member.role === "clinical") return `In ${name}. L'abilità accorcia la fase.`;
+  return `In ${name}. Aiuta il dossier e la lettura dell'autorità.`;
+}
+export function peopleWaiting(g: Game) {
+  const seatOpen = (role: Role) => g.rooms.some((room) => roomDef(room.type).role === role && staffIn(g, room.id).length < slotsFor(room));
+  if (g.staff.some((member) => !member.roomId && seatOpen(member.role))) return true;
+  if (g.staff.length >= headroom(g)) return false;
+  return g.candidates.some((member) => g.rooms.some((room) => {
+    if (room.type === "hq" && !hasGear(g, "sala")) return false;
+    return roomDef(room.type).role === member.role && staffIn(g, room.id, member.role).length === 0;
+  }));
+}
+
 export function orderMat(g: Game, key: MatKey | "vials", units: number) {
   const next = structuredClone(g) as Game;
   const have = key === "api" ? next.api : key === "solvent" ? next.solvent : key === "eccipient" ? next.eccipient : next.vials;
@@ -1199,6 +1296,14 @@ function gownOk(g: Game) {
   return g.rooms.some((r) => r.type === "gown" && roomOnline(g, r) && r.slots.some((s) => s.item?.defId === "armadietti"));
 }
 
+function crewMul(g: Game, room: Room) {
+  const ops = staffIn(g, room.id, "operator");
+  if (!ops.length) return 1;
+  const skill = ops.reduce((sum, member) => sum + member.skill, 0) / ops.length;
+  let mul = 0.88 + 0.04 * skill;
+  if (ops.some((member) => member.trait === "svelto")) mul *= 1.05;
+  return mul;
+}
 function lineOf(g: Game, room: Room) {
   if (!roomOnline(g, room) || room.halt > 0) return null;
   if (staffIn(g, room.id, "operator").length === 0) return null;
@@ -1209,6 +1314,7 @@ function lineOf(g: Game, room: Room) {
     let vel = 0.7 * (0.6 + 0.2 * m) * (0.85 + 0.05 * room.level);
     if (on("filtro-pilota")) vel *= 1.08;
     if (hasMastery(g, "reattore50")) vel *= 1.06;
+    vel *= crewMul(g, room);
     return { room, kind: "pilot" as const, vel, m };
   }
   if (room.type === "plant" && on("reattore-gmp")) {
@@ -1219,6 +1325,7 @@ function lineOf(g: Game, room: Room) {
     if (on("riempimento")) vel *= 1.15;
     if (hasTech(g, "continuo")) vel += hasMastery(g, "continuo") ? 0.36 : 0.25;
     if (hasMastery(g, "classeC")) vel *= 1.05;
+    vel *= crewMul(g, room);
     return { room, kind: "plant" as const, vel, m, fill: on("riempimento") };
   }
   if (room.type === "sterile" && on("bioreattore")) {
@@ -1228,6 +1335,7 @@ function lineOf(g: Game, room: Room) {
     vel *= on("isolatore") ? 1 : 0.5;
     if (itemOn(g, "wfi")) vel *= 1.1;
     if (hasMastery(g, "acque") && itemOn(g, "wfi")) vel *= 1.05;
+    vel *= crewMul(g, room);
     return { room, kind: "sterile" as const, vel, m };
   }
   return null;
@@ -1269,9 +1377,18 @@ function patchJob(g: Game, j: Job) {
   j.progress ??= 0;
   j.done ??= 0;
 }
+function patchPerson(s: Staff, hired: boolean, week: number) {
+  s.trait ??= traitFor(s.role, s.name.length * 3 + s.skill);
+  if (hired) s.leave = 0;
+  else s.leave ??= week + 5;
+}
 function heal(g: Game) {
   g.mastered ??= [];
   g.mastered = g.mastered.filter((id) => g.tech.includes(id));
+  g.staff ??= [];
+  g.candidates ??= [];
+  for (const member of g.staff) patchPerson(member, true, g.week);
+  for (const member of g.candidates) patchPerson(member, false, g.week);
   if (!Array.isArray(g.clients) || g.clients.length === 0) g.clients = clientBook();
   else for (const seed of clientBook()) if (!g.clients.some((c) => c.id === seed.id)) g.clients.push(seed);
   for (const offer of g.offers) patchOffer(offer);
@@ -1285,6 +1402,15 @@ function heal(g: Game) {
 }
 export function sellerOn(g: Game) {
   return g.staff.some((s) => s.role === "commercial" && s.roomId && g.rooms.find((r) => r.id === s.roomId)?.type === "hq") && hasGear(g, "sala");
+}
+export function sellerCut(g: Game) {
+  if (!sellerOn(g)) return 1;
+  const sellers = g.staff.filter((s) => s.role === "commercial" && g.rooms.find((r) => r.id === s.roomId)?.type === "hq");
+  const skill = Math.max(...sellers.map((s) => s.skill));
+  let bonus = 0.05 + 0.01 * skill;
+  if (hasMastery(g, "commerciale")) bonus += 0.03;
+  if (sellers.some((s) => s.trait === "negoziatore")) bonus += 0.02;
+  return 1 + bonus;
 }
 function deskCap(g: Game) {
   return sellerOn(g) ? 4 : 3;
@@ -1548,6 +1674,8 @@ function produce(g: Game) {
       if (hasMastery(g, "gmp") && gownOk(g)) fail -= 0.01;
       if (line.kind === "plant" && hasMastery(g, "scaleup")) fail -= 0.01;
       if (line.kind === "sterile" && hasMastery(g, "asettico")) fail -= 0.02;
+      if (staffIn(g, room.id, "operator").some((member) => member.trait === "preciso")) fail -= 0.012;
+      if (g.staff.some((member) => member.trait === "preciso" && member.role === "qa" && g.rooms.find((r) => r.id === member.roomId)?.type === "qc")) fail -= 0.008;
       fail = clamp(fail, 0.02, 0.45);
       if (roll(g.week * 17 + job.done + g.seq) < fail) {
         job.scrap += 1;
@@ -1567,7 +1695,7 @@ function produce(g: Game) {
         let slice = Math.round(job.pay / job.batches);
         if (blister) slice = Math.round(slice * (1 + 0.05 * blister));
         if (hasGear(g, "astuccio")) slice = Math.round(slice * 1.06);
-        if (commercial) slice = Math.round(slice * (hasMastery(g, "commerciale") ? 1.11 : 1.08));
+        if (commercial) slice = Math.round(slice * sellerCut(g));
         if (line.kind === "plant" && !("fill" in line && line.fill)) slice = Math.round(slice * 0.9);
         g.cash += slice;
         g.stats.revenue += slice;
@@ -1576,7 +1704,8 @@ function produce(g: Game) {
         if (job.done >= job.batches) {
           const client = g.clients.find((c) => c.id === job.clientId);
           if (client) {
-            client.trust = clamp(client.trust + (job.scrap > 0 ? 2 : 8), 0, 100);
+            const warm = job.scrap === 0 && g.staff.some((member) => member.trait === "negoziatore" && member.role === "commercial" && member.roomId);
+            client.trust = clamp(client.trust + (job.scrap > 0 ? 2 : 8) + (warm ? 1 : 0), 0, 100);
             client.last = g.week;
           }
           if (job.science > 0) {
@@ -1602,8 +1731,8 @@ export function scienceRate(g: Game) {
   for (const s of g.staff) {
     if (s.role !== "scientist") continue;
     const room = g.rooms.find((r) => r.id === s.roomId);
-    if (!room) n += 0.4;
-    else if (room.type === "discovery" && roomOnline(g, room) && room.halt === 0) n += 0.35 * s.skill * itemLevel(g, "lcms");
+    if (!room) n += s.trait === "curioso" ? 0.46 : 0.4;
+    else if (room.type === "discovery" && roomOnline(g, room) && room.halt === 0) n += 0.35 * s.skill * itemLevel(g, "lcms") * (s.trait === "curioso" ? 1.15 : 1);
   }
   if (hasMastery(g, "scoperta")) n *= 1.12;
   if (hasMastery(g, "piattaforma")) n += 0.25;
@@ -1622,6 +1751,7 @@ export function trialRisk(g: Game, program: Program) {
   if (hasGear(g, "biostat")) chance -= 0.06;
   if ((program.heat ?? 0) >= 3) chance += 0.04;
   if (hasMastery(g, "clinica3")) chance -= 0.03;
+  if (g.staff.some((member) => member.role === "clinical" && member.trait === "calmo" && member.roomId)) chance -= 0.015;
   return clamp(chance, 0.03, 0.5);
 }
 export function licenseValue(program: Program, g?: Game) {
@@ -1690,6 +1820,7 @@ export function labPace(g: Game, program: Program): { speed: number; need: numbe
       speed = 0.45 * (0.7 + 0.2 * itemLevel(g, "lcms")) * (s / 3);
       if (program.stage === "lead" && hasGear(g, "sintetizzatore")) speed *= 1.2;
       speed *= modality === "biologico" ? (g.focus === "biologici" ? 1.12 : 0.9) : g.focus === "biologici" ? 0.92 : 1;
+      if (g.staff.some((member) => member.trait === "curioso" && member.role === "scientist" && g.rooms.find((r) => r.id === member.roomId)?.type === "discovery")) speed *= 1.08;
     }
   } else if (program.stage === "preclinical") {
     const s = staffSkill(g, "scientist", "preclinical");
@@ -1697,6 +1828,7 @@ export function labPace(g: Game, program: Program): { speed: number; need: numbe
     else if (!s) block = "Metti uno scienziato in preclinica.";
     else if (!hasGear(g, "saggi")) block = "Manca la piattaforma saggi.";
     else speed = 0.4 * (0.6 + 0.2 * itemLevel(g, "saggi")) * (hasGear(g, "toss") ? 1.25 : 0.8) * (s / 3);
+    if (speed > 0 && g.staff.some((member) => member.trait === "curioso" && member.role === "scientist" && g.rooms.find((r) => r.id === member.roomId)?.type === "preclinical")) speed *= 1.08;
     if (speed > 0 && hasMastery(g, "preclinica")) speed *= 1.12;
   } else if (program.stage === "phase1") {
     const home = g.rooms.find((r) => r.type === "phase1");
@@ -1705,6 +1837,7 @@ export function labPace(g: Game, program: Program): { speed: number; need: numbe
     else if (!s) block = "Metti un clinico in fase I.";
     else if (!hasGear(g, "pharmacy") || !hasGear(g, "letti")) block = "Servono pharmacy e unità letti.";
     else speed = (0.5 + 0.15 * itemLevel(g, "monitor-1") + 0.1 * home.level) * (s / 4);
+    if (speed > 0 && g.staff.some((member) => member.trait === "chiaro" && member.role === "clinical" && g.rooms.find((r) => r.id === member.roomId)?.type === "phase1")) speed *= 1.06;
     if (speed > 0 && hasMastery(g, "clinica1")) speed *= 1.12;
   } else if (program.stage === "phase2" || program.stage === "phase3") {
     const home = g.rooms.find((r) => r.type === "phase23");
@@ -1714,6 +1847,7 @@ export function labPace(g: Game, program: Program): { speed: number; need: numbe
     else if (!hasGear(g, "unitdose")) block = "Manca l'unit dose.";
     else if (program.stage === "phase3" && !hasGear(g, "tmf")) block = "La fase III vuole l'archivio TMF.";
     else speed = (0.5 + 0.15 * itemLevel(g, "monitor-2") + 0.1 * home.level) * (s / 4);
+    if (speed > 0 && program.stage === "phase2" && g.staff.some((member) => member.trait === "chiaro" && member.role === "clinical" && g.rooms.find((r) => r.id === member.roomId)?.type === "phase23")) speed *= 1.06;
     if (speed > 0 && program.stage === "phase2" && hasMastery(g, "clinica2")) speed *= 1.1;
   } else if (program.stage === "dossier") {
     const s = staffSkill(g, "regulatory", "regulatory");
@@ -1721,6 +1855,7 @@ export function labPace(g: Game, program: Program): { speed: number; need: numbe
     else if (!s) block = "Metti un regolatorio sull'archivio.";
     else if (!hasGear(g, "dossier")) block = "Manca l'archivio dossier.";
     else speed = 0.7 * (s / 3) * (hasGear(g, "archivio-stab") ? 1.1 : 1);
+    if (speed > 0 && g.staff.some((member) => member.trait === "chiaro" && member.role === "regulatory" && g.rooms.find((r) => r.id === member.roomId)?.type === "regulatory")) speed *= 1.1;
   }
   if (speed <= 0) return { speed: 0, need, text: block };
   const weeks = Math.max(1, Math.ceil(Math.max(0, need - program.progress) / speed));
@@ -1738,7 +1873,8 @@ function research(g: Game) {
       program.reviewLeft -= 1;
       if (program.reviewLeft <= 0) {
         const authority = AUTHORITIES.find((a) => a.name === program.authority) ?? AUTHORITIES[0]!;
-        const bonus = (staffSkill(g, "regulatory", "regulatory") ? 0.1 : 0) + g.quality / 320 + (hasGear(g, "dossier") ? 0.06 : 0);
+        const preciso = g.staff.some((member) => member.role === "regulatory" && member.trait === "preciso" && g.rooms.find((r) => r.id === member.roomId)?.type === "regulatory");
+        const bonus = (staffSkill(g, "regulatory", "regulatory") ? 0.1 : 0) + g.quality / 320 + (hasGear(g, "dossier") ? 0.06 : 0) + (preciso ? 0.03 : 0);
         if (roll(g.week * 5 + g.seq) > authority.strict - bonus) {
           program.stage = "approved";
           g.stats.approvals += 1;
@@ -1958,7 +2094,14 @@ function upkeep(g: Game) {
   for (const s of g.staff) burn += s.salary;
   g.cash -= Math.round(burn);
   for (const room of g.rooms) if (room.halt > 0) room.halt -= 1;
-  if (g.staff.some((s) => s.role === "qa" && g.rooms.find((r) => r.id === s.roomId)?.type === "qc")) g.quality = clamp(g.quality + 0.7, 0, 100);
+  const qa = g.staff.filter((member) => member.role === "qa" && ["qc", "stability"].includes(g.rooms.find((r) => r.id === member.roomId)?.type ?? ""));
+  if (qa.length) {
+    const inQc = qa.filter((member) => g.rooms.find((r) => r.id === member.roomId)?.type === "qc");
+    const pool = inQc.length ? inQc : qa;
+    let gain = (inQc.length ? 0.22 : 0.12) * Math.max(...pool.map((member) => member.skill));
+    if (pool.some((member) => member.trait === "calmo")) gain *= 1.25;
+    g.quality = clamp(g.quality + gain, 0, 100);
+  }
   if (hasGear(g, "freezer") && !hasGear(g, "allarme") && g.vials > 0 && roll(g.week * 9) < 0.02) {
     g.vials = Math.round(g.vials * 0.8);
     pushLog(g, "Un freezer va fuori range. Perdi flaconi.", "bad");
@@ -1987,7 +2130,7 @@ function worldEvent(g: Game) {
     g.science += 3;
     pushLog(g, "Bando di ricerca. Cassa e scienza.", "good");
   } else if (n === 4) {
-    g.candidates.push(person(g, "operator", 4));
+    g.candidates.push(person(g, "operator", 4, g.week + 4));
     pushLog(g, "Un operatore bussa.", "good");
   } else if (n === 5) {
     const rival = g.rivals[Math.floor(roll(g.week) * g.rivals.length)]!;
@@ -2000,12 +2143,17 @@ function worldEvent(g: Game) {
 }
 
 function candidates(g: Game) {
+  const gone = g.candidates.filter((member) => member.leave > 0 && member.leave < g.week);
+  if (gone.length) {
+    pushLog(g, gone.length === 1 ? `${gone[0]!.name} non aspetta più.` : `${gone.length} candidati non aspettano più.`, "info");
+    g.candidates = g.candidates.filter((member) => !(member.leave > 0 && member.leave < g.week));
+  }
   if (g.week % 5 !== 0) return;
   const pool: Role[] = ["operator", "qa", "scientist"];
   if (hasTech(g, "clinica1")) pool.push("clinical", "regulatory");
   if (g.stats.batches > 2) pool.push("commercial");
   const role = pool[Math.floor(roll(g.week * 11) * pool.length)]!;
-  g.candidates.push(person(g, role, 2 + Math.floor(roll(g.week + g.seq) * 4)));
+  g.candidates.push(person(g, role, 2 + Math.floor(roll(g.week + g.seq) * 4), g.week + 5));
   if (g.candidates.length > 5) g.candidates.shift();
 }
 

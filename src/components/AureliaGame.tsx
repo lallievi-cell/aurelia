@@ -34,6 +34,7 @@ import {
   demandOf,
   deskLines,
   dismiss,
+  dutyOf,
   euro,
   expandRoom,
   gearDef,
@@ -41,7 +42,9 @@ import {
   hasGear,
   hasMastery,
   hasTech,
+  headroom,
   hire,
+  hireCost,
   installGear,
   labPace,
   launchProduct,
@@ -53,6 +56,8 @@ import {
   matPrice,
   newGame,
   orderMat,
+  payroll,
+  peopleWaiting,
   pinJob,
   parcelAt,
   placeCorridor,
@@ -66,6 +71,7 @@ import {
   researchGate,
   roomDef,
   roomOnline,
+  seatsFor,
   scienceRate,
   sellerOn,
   setAutoBuy,
@@ -78,6 +84,8 @@ import {
   techGate,
   techOpens,
   TIER_LABEL,
+  TRAIT_LABEL,
+  TRAIT_NOTE,
   tick,
   train,
   trainCost,
@@ -95,6 +103,7 @@ import {
   type MatKey,
   type Modality,
   type Offer,
+  type Role,
   type ParcelId,
   type Program,
   type RoomType,
@@ -397,7 +406,7 @@ export function AureliaGame() {
         <Nav icon={<ScrollText />} label="Contratti" on={tab === "deals"} click={() => setTab("deals")} dot={game.offers.length > 0} />
         <Nav icon={<FlaskConical />} label="Ricerca" on={tab === "research"} click={() => setTab("research")} dot={game.pipeline.some((item) => item.waiting)} />
         <Nav icon={<GitBranch />} label="Tecniche" on={tab === "tech"} click={() => setTab("tech")} dot={TECH.some((tech) => !hasTech(game, tech.id) && !techGate(game, tech.id))} />
-        <Nav icon={<Users />} label="Persone" on={tab === "team"} click={() => setTab("team")} />
+        <Nav icon={<Users />} label="Persone" on={tab === "team"} click={() => setTab("team")} dot={peopleWaiting(game)} />
         <Nav icon={<Globe2 />} label="Mondo" on={tab === "world"} click={() => setTab("world")} />
       </nav>
     </div>
@@ -538,7 +547,7 @@ function RoomPanel({ game, id, apply, close }: { game: Game; id: string; apply: 
             <div key={s.id} className="flex items-center justify-between rounded-xl bg-paper px-3 py-2">
               <span>
                 {s.name}
-                <span className="block text-sm text-mist">abilità {s.skill}</span>
+                <span className="block text-sm text-mist">{TRAIT_LABEL[s.trait]} · abilità {s.skill}</span>
               </span>
               <button type="button" className="min-h-11 rounded-full px-3 text-sm text-teal" onClick={() => apply(assign(game, s.id, null))}>
                 Togli
@@ -547,7 +556,7 @@ function RoomPanel({ game, id, apply, close }: { game: Game; id: string; apply: 
           ))}
           {free.map((s) => (
             <button key={s.id} type="button" className="min-h-11 rounded-xl border border-line px-3 text-left" onClick={() => apply(assign(game, s.id, id))}>
-              Assegna {s.name}
+              Assegna {s.name} · {TRAIT_LABEL[s.trait]}
             </button>
           ))}
         </div>
@@ -1056,36 +1065,114 @@ function TechTree({ game, apply }: { game: Game; apply: (g: Game | string) => vo
   );
 }
 
-function Team({ game, apply }: { game: Game; apply: (g: Game | string) => void }) {
+const ROLE_INK: Record<Role, string> = {
+  operator: "#1b7a64",
+  qa: "#c88812",
+  scientist: "#12262c",
+  clinical: "#8a4b45",
+  regulatory: "#3d5c66",
+  commercial: "#8a5a12",
+};
+const ROLE_ORDER: Role[] = ["operator", "qa", "scientist", "commercial", "clinical", "regulatory"];
+
+function mono(name: string) {
+  const bits = name.split(" ");
+  return `${bits[0]?.[0] ?? ""}${bits[1]?.[0] ?? ""}`.toUpperCase();
+}
+
+function Pips({ n }: { n: number }) {
   return (
-    <div className="mx-auto grid max-w-lg gap-4">
-      <h2 className="font-display text-3xl">Persone</h2>
-      {game.staff.map((person) => {
-        const home = game.rooms.find((r) => r.id === person.roomId);
+    <span className="flex gap-0.5">
+      {Array.from({ length: 6 }, (_, index) => (
+        <span key={index} className={`h-1.5 w-3 rounded-sm ${index < n ? "bg-teal" : "bg-line"}`} />
+      ))}
+    </span>
+  );
+}
+
+function Team({ game, apply }: { game: Game; apply: (g: Game | string) => void }) {
+  const [role, setRole] = useState<Role | "tutti">("tutti");
+  const cap = headroom(game);
+  const bench = game.staff.filter((member) => !member.roomId).reduce((sum, member) => sum + member.salary, 0);
+  const visible = role === "tutti" ? game.staff : game.staff.filter((member) => member.role === role);
+  const waiting = role === "tutti" ? game.candidates : game.candidates.filter((member) => member.role === role);
+  return (
+    <div className="mx-auto grid max-w-lg gap-3">
+      <header className="badge px-4 py-3" style={{ boxShadow: "inset 5px 0 0 #1b7a64, 0 8px 18px rgba(18,38,44,.05)" }}>
+        <p className="text-[11px] tracking-widest text-mist uppercase">Registro del personale</p>
+        <h2 className="font-display text-3xl">Persone</h2>
+        <p className="text-sm text-mist">
+          {game.staff.length} di {cap} in direzione · stipendi {euro(payroll(game))}/sett.
+          {bench ? ` · ${euro(bench)} fermi in panchina` : ""}
+        </p>
+      </header>
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        <button type="button" onClick={() => setRole("tutti")} className={`min-h-11 shrink-0 rounded-full px-3 text-sm ${role === "tutti" ? "bg-ink text-card" : "bg-card"}`}>Tutti</button>
+        {ROLE_ORDER.map((id) => (
+          <button key={id} type="button" onClick={() => setRole(id)} className={`min-h-11 shrink-0 rounded-full px-3 text-sm ${role === id ? "bg-ink text-card" : "bg-card"}`}>
+            {ROLE_LABEL[id]}
+          </button>
+        ))}
+      </div>
+      {visible.map((member) => {
+        const seats = seatsFor(game, member);
         return (
-          <article key={person.id} className="rounded-xl border border-line bg-card px-3 py-2">
-            <div className="flex items-center justify-between gap-2">
-              <span>
-                <span className="block font-medium">{person.name}</span>
-                <span className="text-sm text-mist">{ROLE_LABEL[person.role]} · abilità {person.skill} · {euro(person.salary)}/sett.{home ? ` · ${roomDef(home.type).name}` : " · in panchina"}</span>
-              </span>
-              <button type="button" className="min-h-11 rounded-full px-3 text-sm text-mist" onClick={() => apply(dismiss(game, person.id))}>Esci</button>
+          <article key={member.id} className="badge px-3 py-3" style={{ boxShadow: `inset 5px 0 0 ${ROLE_INK[member.role]}, 0 8px 18px rgba(18,38,44,.05)` }}>
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="seal sm" style={{ background: ROLE_INK[member.role] }}>{mono(member.name)}</span>
+                <span>
+                  <span className="block font-medium">{member.name}</span>
+                  <span className="text-sm text-mist">{ROLE_LABEL[member.role]} · {TRAIT_LABEL[member.trait]} · {euro(member.salary)}/sett.</span>
+                </span>
+              </div>
+              <button type="button" className="min-h-11 shrink-0 rounded-full px-2 text-sm text-mist" onClick={() => apply(dismiss(game, member.id))}>Esci · {euro(member.salary * 2)}</button>
             </div>
-            {person.skill < 6 ? (
-              <button type="button" className="mt-2 min-h-11 w-full rounded-full bg-paper text-sm" onClick={() => apply(train(game, person.id))}>
-                Forma · {euro(trainCost(game, person.skill))}
-              </button>
-            ) : null}
+            <div className="mt-2"><Pips n={member.skill} /></div>
+            <p className="mt-2 text-sm">{dutyOf(game, member)}</p>
+            <p className="text-sm text-mist">{TRAIT_NOTE[member.trait]}</p>
+            <div className="mt-2 flex flex-wrap gap-1">
+              {member.roomId ? (
+                <button type="button" className="min-h-11 rounded-full bg-card px-3 text-sm" onClick={() => apply(assign(game, member.id, null))}>Panchina</button>
+              ) : null}
+              {seats.map((seat) => (
+                <button key={seat.id} type="button" disabled={!seat.open || seat.here} className="min-h-11 rounded-full bg-card px-3 text-sm disabled:opacity-40" onClick={() => apply(assign(game, member.id, seat.id))}>
+                  {seat.here ? seat.name : `${seat.name} · ${seat.used}/${seat.cap}`}
+                </button>
+              ))}
+            </div>
+            {seats.length === 0 ? <p className="mt-2 text-sm text-mist">Nessuna stanza chiede questo ruolo.</p> : null}
+            {member.skill >= 6 ? <p className="mt-2 text-sm text-mist">Abilità al massimo.</p> : hasTech(game, "formazione") ? (
+              <button type="button" className="mt-2 min-h-11 w-full rounded-full bg-ink text-sm text-card" onClick={() => apply(train(game, member.id))}>Forma · {euro(trainCost(game, member.skill))}</button>
+            ) : <p className="mt-2 text-sm text-amber">Prima la tecnica Formazione. Poi l'abilità sale fino a 6.</p>}
           </article>
         );
       })}
-      <h3 className="font-display text-2xl">Candidati</h3>
-      {game.candidates.map((person) => (
-        <button key={person.id} type="button" className="min-h-14 rounded-xl border border-line bg-card px-3 text-left" onClick={() => apply(hire(game, person.id))}>
-          <span className="block font-medium">Assumi {person.name}</span>
-          <span className="text-sm text-mist">{ROLE_LABEL[person.role]} · abilità {person.skill} · {euro(person.salary)}/sett. · ingresso 12 mila €</span>
-        </button>
-      ))}
+      <h3 className="font-display text-2xl">In attesa</h3>
+      <p className="text-sm text-mist">Restano poche settimane, poi vanno da un'altra parte. Alzare la direzione fa entrare più persone.</p>
+      {waiting.length === 0 ? <p className="text-sm text-mist">Nessuno in questa coda.</p> : null}
+      {waiting.map((member) => {
+        const weeks = Math.max(0, member.leave - game.week);
+        const full = game.staff.length >= cap;
+        return (
+          <article key={member.id} className="badge px-3 py-3" style={{ boxShadow: `inset 5px 0 0 ${ROLE_INK[member.role]}, 0 8px 18px rgba(18,38,44,.05)` }}>
+            <div className="flex items-center gap-2">
+              <span className="seal sm" style={{ background: ROLE_INK[member.role] }}>{mono(member.name)}</span>
+              <span>
+                <span className="block font-medium">{member.name}</span>
+                <span className="text-sm text-mist">{ROLE_LABEL[member.role]} · {TRAIT_LABEL[member.trait]} · {euro(member.salary)}/sett. · {weeks === 0 ? "se ne va questa settimana" : `ancora ${weeks} ${weeks === 1 ? "settimana" : "settimane"}`}</span>
+              </span>
+            </div>
+            <div className="mt-2"><Pips n={member.skill} /></div>
+            <p className="mt-1 text-sm text-mist">{TRAIT_NOTE[member.trait]}</p>
+            {full ? <p className="mt-2 text-sm text-amber">La direzione è piena. Alza il suo livello.</p> : (
+              <button type="button" className="mt-2 min-h-12 w-full rounded-full bg-teal font-semibold text-card" onClick={() => apply(hire(game, member.id))}>
+                Assumi · {euro(hireCost(member.skill))}
+              </button>
+            )}
+          </article>
+        );
+      })}
     </div>
   );
 }
