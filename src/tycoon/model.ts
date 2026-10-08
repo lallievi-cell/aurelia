@@ -2,6 +2,7 @@ export const COLS = 20;
 export const ROWS = 16;
 
 export type Focus = "sintesi" | "biologici";
+export type Modality = "chimica" | "biologico";
 export type Role = "scientist" | "operator" | "qa" | "clinical" | "regulatory" | "commercial";
 export type Tone = "good" | "bad" | "info";
 export type Era = "early" | "mid" | "late" | "oltre";
@@ -68,6 +69,8 @@ export type Stage =
   | "licensed"
   | "failed";
 export type Tier = "pilota" | "standard" | "premium" | "sterile";
+export type Shape = "campione" | "fornitura" | "urgenza" | "trasferimento";
+export type Clauses = { rush: boolean; tight: boolean; penalty: boolean };
 
 export type Gear = { defId: string; level: number; mat?: MatKey };
 export type Room = {
@@ -84,21 +87,40 @@ export type Room = {
 };
 export type Tile = { corridor: boolean; roomId: string | null; ground: "lot" | "garden" };
 export type Staff = { id: string; name: string; role: Role; skill: number; salary: number; roomId: string | null };
+export type Client = { id: string; name: string; trust: number; taste: Tier; note: string; last: number };
 export type Offer = {
   id: string;
   client: string;
+  clientId: string;
   title: string;
   tier: Tier;
+  shape: Shape;
   batches: number;
   pay: number;
+  basePay: number;
   api: number;
   solvent: number;
   eccipient: number;
   vials: number;
   quality: number;
+  baseQuality: number;
   expires: number;
+  dueWeeks: number;
+  clauses: Clauses;
+  blurb: string;
+  science: number;
 };
-export type Job = Offer & { status: "queued" | "active"; done: number; roomId: string | null; progress: number };
+export type Job = Offer & {
+  status: "queued" | "active";
+  done: number;
+  roomId: string | null;
+  progress: number;
+  due: number;
+  scrap: number;
+  prefer: string | null;
+  lateHit: boolean;
+  penalScrap: boolean;
+};
 export type Program = {
   id: string;
   code: string;
@@ -109,6 +131,9 @@ export type Program = {
   reviewLeft: number;
   authority: string | null;
   patented: boolean;
+  modality: Modality;
+  heat: number;
+  rivalId: string | null;
 };
 export type Product = { id: string; code: string; indication: string; price: number; patented: boolean; patentLeft: number };
 export type Rival = { id: string; name: string; share: number; note: string };
@@ -136,6 +161,7 @@ export type Game = {
   science: number;
   tech: TechId[];
   autoBuy: boolean;
+  clients: Client[];
   offers: Offer[];
   jobs: Job[];
   pipeline: Program[];
@@ -316,11 +342,21 @@ export const GEAR: GearDef[] = [
 ];
 
 export const ERA_LABEL: Record<Era, string> = { early: "Inizio", mid: "Crescita", late: "Espansione", oltre: "Oltre" };
-export const INDICATIONS = ["Infezioni", "Oncologia", "Metabolico", "Malattie rare", "Immunologia", "Cardiologia", "Neurologia", "Respiratorio"];
+export const INDICATION_BOOK: { name: string; risk: number; pull: number; note: string }[] = [
+  { name: "Infezioni", risk: 0.08, pull: 1.05, note: "Tanti pazienti. I trial si leggono bene." },
+  { name: "Oncologia", risk: 0.16, pull: 1.28, note: "Mercato grosso. Cade più spesso." },
+  { name: "Metabolico", risk: 0.1, pull: 1.08, note: "Domanda larga, concorrenza vicina." },
+  { name: "Malattie rare", risk: 0.06, pull: 0.86, note: "Pochi pazienti. In licenza rende di più." },
+  { name: "Immunologia", risk: 0.12, pull: 1.16, note: "Vuole una preclinica pulita." },
+  { name: "Cardiologia", risk: 0.14, pull: 1.12, note: "La fase III è lunga e cara." },
+  { name: "Neurologia", risk: 0.2, pull: 1.34, note: "Il premio alto. Anche il fallimento." },
+  { name: "Respiratorio", risk: 0.09, pull: 1, note: "Se arriva una pandemia, vende di più." },
+];
+export const INDICATIONS = INDICATION_BOOK.map((item) => item.name);
 export const AUTHORITIES = [
-  { id: "aifa", name: "AIFA", weeks: 6, strict: 0.18 },
-  { id: "ema", name: "EMA", weeks: 10, strict: 0.26 },
-  { id: "fda", name: "FDA", weeks: 12, strict: 0.32 },
+  { id: "aifa", name: "AIFA", weeks: 6, strict: 0.18, blurb: "Veloce. Il mercato resta europeo." },
+  { id: "ema", name: "EMA", weeks: 10, strict: 0.26, blurb: "La via di mezzo, tempi medi." },
+  { id: "fda", name: "FDA", weeks: 12, strict: 0.32, blurb: "Lunga e stretta. Se passa, la quota sale." },
 ];
 export const STAGE_NEED: Partial<Record<Stage, number>> = { discovery: 4, lead: 5, preclinical: 6, phase1: 6, phase2: 8, phase3: 10, dossier: 4 };
 export const STAGE_LABEL: Record<Stage, string> = {
@@ -360,7 +396,26 @@ export const CHAPTER_BLURB: Record<string, string> = {
 
 const FIRST = ["Giulia", "Marco", "Lea", "Davide", "Noor", "Chiara", "Andrea", "Sara", "Luca", "Marta", "Elena", "Pietro"];
 const LAST = ["Riva", "Conti", "Greco", "Ferrari", "Sala", "Costa", "Marini", "Gallo", "Leone", "Vitale"];
-const CLIENTS = ["Lumen", "Oster & Vale", "Marrow", "Siena Labs", "Quill", "Nordlicht", "Petra Bio", "Ilex", "Monteluce", "Nara"];
+const BOOK: { id: string; name: string; taste: Tier; note: string; trust: number }[] = [
+  { id: "lumen", name: "Lumen", taste: "pilota", note: "Prima fornitura. Specifica morbida.", trust: 36 },
+  { id: "oster", name: "Oster & Vale", taste: "standard", note: "Vuole la data, non le scuse.", trust: 34 },
+  { id: "marrow", name: "Marrow", taste: "premium", note: "Scala clinica. Uno scarto basta.", trust: 28 },
+  { id: "siena", name: "Siena Labs", taste: "standard", note: "Se chiudi pulito, torna.", trust: 40 },
+  { id: "quill", name: "Quill", taste: "pilota", note: "Cede processi. Paga poco.", trust: 30 },
+  { id: "nord", name: "Nordlicht", taste: "sterile", note: "Solo flaconi, solo suite.", trust: 26 },
+  { id: "petra", name: "Petra Bio", taste: "sterile", note: "Biologici. Isolatore o niente.", trust: 24 },
+  { id: "ilex", name: "Ilex", taste: "premium", note: "Urgenze di fine trimestre.", trust: 32 },
+  { id: "monte", name: "Monteluce", taste: "standard", note: "Ospedale. Conta la reputazione.", trust: 38 },
+  { id: "nara", name: "Nara", taste: "pilota", note: "Startup. Cresce se cresci tu.", trust: 22 },
+];
+const BLURB: Record<Shape, string> = {
+  campione: "Due lotti piccoli, per vedere se il processo regge.",
+  fornitura: "Se chiudi senza scarti, la casa rimette un ordine sul tavolo.",
+  urgenza: "Finestra corta. Si paga meglio, ma la data non si sposta.",
+  trasferimento: "Poca cassa. A fine lavoro resta il processo, in scienza.",
+};
+export const TIER_LABEL: Record<Tier, string> = { pilota: "Pilota", standard: "Standard", premium: "Scala", sterile: "Sterile" };
+export const SHAPE_LABEL: Record<Shape, string> = { campione: "Prova", fornitura: "Campagna", urgenza: "Urgenza", trasferimento: "Processo" };
 const MAT_PRICE: Record<MatKey | "vials", number> = { api: 7800, solvent: 2200, eccipient: 1600, vials: 3800 };
 
 export function roomDef(type: RoomType) {
@@ -457,6 +512,7 @@ export function newGame(name: string, focus: Focus): Game {
     science: 1,
     tech: focus === "biologici" ? ["gmp"] : [],
     autoBuy: true,
+    clients: clientBook(),
     offers: [],
     jobs: [],
     pipeline: [],
@@ -500,6 +556,7 @@ export function normalize(input: unknown): Game | null {
   g.products ??= [];
   g.jobs ??= [];
   g.offers ??= [];
+  heal(g);
   return g;
 }
 
@@ -733,6 +790,7 @@ export function removeRoom(g: Game, id: string) {
   if (room.slots.some((s) => s.item)) return "Prima togli macchine e arredi.";
   if (next.jobs.some((j) => j.roomId === id)) return "C'è un lotto in corso.";
   for (const s of next.staff) if (s.roomId === id) s.roomId = null;
+  for (const job of next.jobs) if (job.prefer === id) job.prefer = null;
   for (const t of roomTiles(room)) next.tiles[t.r]![t.c]!.roomId = null;
   next.rooms = next.rooms.filter((r) => r.id !== id);
   next.cash += Math.round(roomDef(room.type).shell * 0.5);
@@ -993,48 +1051,224 @@ function lineOf(g: Game, room: Room) {
   return null;
 }
 
-function refreshOffers(g: Game, force: boolean) {
-  g.offers = g.offers.filter((o) => o.expires >= g.week);
-  if (!force && g.week % 3 !== 1 && g.offers.length >= 3) return;
+function clientBook(): Client[] {
+  return BOOK.map((b) => ({ id: b.id, name: b.name, trust: b.trust, taste: b.taste, note: b.note, last: 0 }));
+}
+function spanWeeks(shape: Shape, batches: number, rush: boolean) {
+  const base = shape === "urgenza" ? batches * 2 + 2 : shape === "trasferimento" ? batches * 4 + 3 : shape === "fornitura" ? batches * 3 + 4 : batches * 3 + 3;
+  return Math.max(batches + 1, base - (rush ? 2 : 0));
+}
+function priced(base: number, clauses: Clauses) {
+  let m = 1;
+  if (clauses.rush) m *= 1.14;
+  if (clauses.tight) m *= 1.1;
+  if (clauses.penalty) m *= 1.08;
+  return Math.round(base * m);
+}
+function patchOffer(o: Offer) {
+  o.shape ??= o.tier === "pilota" ? "campione" : "fornitura";
+  o.clauses ??= { rush: false, tight: false, penalty: false };
+  o.basePay ??= o.pay;
+  o.baseQuality ??= o.quality;
+  o.dueWeeks ??= spanWeeks(o.shape, o.batches, o.clauses.rush);
+  o.science ??= 0;
+  o.blurb ??= BLURB[o.shape];
+  o.clientId ??= BOOK.find((b) => b.name === o.client)?.id ?? "lumen";
+  o.quality = o.baseQuality + (o.clauses.tight ? 8 : 0);
+  o.pay = priced(o.basePay, o.clauses);
+}
+function patchJob(g: Game, j: Job) {
+  patchOffer(j);
+  j.due ??= g.week + j.dueWeeks;
+  j.scrap ??= 0;
+  j.prefer ??= null;
+  j.lateHit ??= false;
+  j.penalScrap ??= false;
+  j.progress ??= 0;
+  j.done ??= 0;
+}
+function heal(g: Game) {
+  if (!Array.isArray(g.clients) || g.clients.length === 0) g.clients = clientBook();
+  else for (const seed of clientBook()) if (!g.clients.some((c) => c.id === seed.id)) g.clients.push(seed);
+  for (const offer of g.offers) patchOffer(offer);
+  for (const job of g.jobs) patchJob(g, job);
+  g.pipeline ??= [];
+  for (const program of g.pipeline) {
+    program.modality ??= "chimica";
+    program.heat ??= 0;
+    program.rivalId ??= null;
+  }
+}
+export function sellerOn(g: Game) {
+  return g.staff.some((s) => s.role === "commercial" && s.roomId && g.rooms.find((r) => r.id === s.roomId)?.type === "hq") && hasGear(g, "sala");
+}
+function deskCap(g: Game) {
+  return sellerOn(g) ? 4 : 3;
+}
+function fitsTier(tier: Tier, kind: "pilot" | "plant" | "sterile", m: number) {
+  if (tier === "sterile") return kind === "sterile";
+  if (tier === "premium") return kind === "plant" && m >= 2;
+  if (tier === "standard") return (kind === "pilot" && m >= 2) || kind === "plant";
+  return kind === "pilot" || kind === "plant";
+}
+function trustMul(trust: number) {
+  return 0.94 + trust / 500;
+}
+function pickClient(g: Game, tier: Tier) {
+  const busy = new Set([...g.offers.map((o) => o.clientId), ...g.jobs.map((j) => j.clientId)]);
+  let pool = g.clients.filter((c) => !busy.has(c.id));
+  if (!pool.length) pool = [...g.clients];
+  const taste = pool.filter((c) => c.taste === tier);
+  if (taste.length && roll(g.seq + g.week) > 0.35) pool = taste;
+  return pool[Math.floor(roll(g.seq * 3 + g.week + pool.length) * pool.length)] ?? g.clients[0]!;
+}
+function pickShape(g: Game, tier: Tier, dice: number): Shape {
+  if (tier === "sterile" || tier === "premium") return dice > 0.62 ? "urgenza" : "fornitura";
+  if (dice > 0.8 && g.staff.some((s) => s.role === "scientist")) return "trasferimento";
+  if (tier !== "pilota" && dice > 0.55 && g.reputation >= 44) return "urgenza";
+  if (tier !== "pilota" && dice > 0.22) return "fornitura";
+  return "campione";
+}
+function pushOffer(g: Game, fixed?: { client: Client; tier: Tier; shape: Shape; payMul?: number }) {
   const canStd = gearList(g, "reattore").some((h) => h.item.level >= 2) || hasGear(g, "reattore-gmp");
   const canPrem = hasGear(g, "climatica") || (itemLevel(g, "reattore-gmp") >= 2 && hasGear(g, "hplc"));
   const canBio = hasGear(g, "bioreattore");
+  const dice = roll(g.week * 13 + g.seq);
+  let tier: Tier = fixed?.tier ?? "pilota";
+  if (!fixed) {
+    if (canBio && dice > 0.74) tier = "sterile";
+    else if (canPrem && dice > 0.56) tier = "premium";
+    else if (canStd && dice > 0.34) tier = "standard";
+  }
+  const shape = fixed?.shape ?? pickShape(g, tier, dice);
+  const client = fixed?.client ?? pickClient(g, tier);
+  let batches = shape === "fornitura" || tier === "premium" ? 3 : 2;
+  if (tier === "sterile") batches = 2;
+  const payEach = tier === "pilota" ? 130_000 : tier === "standard" ? 155_000 : tier === "premium" ? 200_000 : 240_000;
+  const shapeMul = shape === "trasferimento" ? 0.7 : shape === "fornitura" ? 1.06 : 1;
+  const clauses: Clauses = shape === "urgenza" ? { rush: true, tight: false, penalty: true } : { rush: false, tight: false, penalty: false };
+  const basePay = Math.round(batches * payEach * shapeMul * trustMul(client.trust) * (fixed?.payMul ?? 1));
+  const baseQuality = tier === "pilota" ? 46 : tier === "standard" ? 58 : tier === "premium" ? 70 : 74;
+  g.offers.push({
+    id: nid(g, "o"),
+    client: client.name,
+    clientId: client.id,
+    title: `${SHAPE_LABEL[shape]} ${client.name}`,
+    tier,
+    shape,
+    batches,
+    basePay,
+    pay: priced(basePay, clauses),
+    api: tier === "pilota" ? 1 : 2,
+    solvent: tier === "sterile" ? 0 : 1,
+    eccipient: tier === "sterile" ? 0 : 1,
+    vials: tier === "sterile" ? 2 : 0,
+    baseQuality,
+    quality: baseQuality,
+    expires: g.week + (shape === "urgenza" ? 4 : 6),
+    dueWeeks: spanWeeks(shape, batches, clauses.rush),
+    clauses,
+    blurb: BLURB[shape],
+    science: shape === "trasferimento" ? 3 : 0,
+  });
+  return true;
+}
+function followOn(g: Game, job: Job) {
+  if (job.shape !== "fornitura" || job.scrap > 0) return;
+  if (g.offers.length >= deskCap(g)) return;
+  const client = g.clients.find((c) => c.id === job.clientId);
+  if (!client || client.trust < 36) return;
+  if (g.offers.some((o) => o.clientId === client.id)) return;
+  pushOffer(g, { client, tier: job.tier, shape: "fornitura", payMul: 1.05 });
+  pushLog(g, `${client.name} rimette una campagna sul tavolo.`, "info");
+}
+
+function refreshOffers(g: Game, force: boolean) {
+  heal(g);
+  g.offers = g.offers.filter((o) => o.expires >= g.week);
+  const cap = deskCap(g);
+  if (!force && g.offers.length >= cap) return;
+  let target = cap;
+  if (!force && g.week % 3 !== 1) target = g.offers.length === 0 ? Math.min(2, cap) : Math.min(cap, g.offers.length + (g.week % 2 === 0 ? 1 : 0));
   let guard = 0;
-  while (g.offers.length < 3 && guard < 6) {
+  while (g.offers.length < target && guard < 8) {
     guard += 1;
-    const dice = roll(g.week * 13 + g.seq + guard);
-    let tier: Tier = "pilota";
-    if (canBio && dice > 0.72) tier = "sterile";
-    else if (canPrem && dice > 0.55) tier = "premium";
-    else if (canStd && dice > 0.35) tier = "standard";
-    const batches = tier === "pilota" ? 2 : tier === "premium" ? 3 : 2 + (dice > 0.5 ? 1 : 0);
-    const payEach = tier === "pilota" ? 130_000 : tier === "standard" ? 155_000 : tier === "premium" ? 200_000 : 240_000;
-    const client = CLIENTS[Math.floor(roll(g.seq + guard * 5) * CLIENTS.length)]!;
-    g.offers.push({
-      id: nid(g, "o"),
-      client,
-      title: tier === "pilota" ? `Pilota ${client}` : tier === "standard" ? `Sintesi ${client}` : tier === "premium" ? `Scala ${client}` : `Sterile ${client}`,
-      tier,
-      batches,
-      pay: batches * payEach,
-      api: tier === "pilota" ? 1 : 2,
-      solvent: tier === "sterile" ? 0 : 1,
-      eccipient: tier === "sterile" ? 0 : 1,
-      vials: tier === "sterile" ? 2 : 0,
-      quality: tier === "pilota" ? 46 : tier === "standard" ? 58 : tier === "premium" ? 70 : 74,
-      expires: g.week + 6,
-    });
+    pushOffer(g);
   }
 }
 
 export function acceptOffer(g: Game, id: string) {
   const next = structuredClone(g) as Game;
+  heal(next);
   const idx = next.offers.findIndex((o) => o.id === id);
   if (idx < 0) return g;
   const offer = next.offers.splice(idx, 1)[0]!;
-  next.jobs.push({ ...offer, status: "queued", done: 0, roomId: null, progress: 0 });
-  pushLog(next, `Contratto ${offer.client}: ${offer.batches} lotti, ${euro(offer.pay)}.`, "info");
+  next.jobs.push({ ...offer, status: "queued", done: 0, roomId: null, progress: 0, due: next.week + offer.dueWeeks, scrap: 0, prefer: null, lateHit: false, penalScrap: false });
+  pushLog(next, `Firmato ${offer.client}: ${offer.batches} lotti entro la settimana ${next.week + offer.dueWeeks}.`, "info");
   markGoals(next);
+  return next;
+}
+
+export function tuneOffer(g: Game, id: string, key: keyof Clauses) {
+  const next = structuredClone(g) as Game;
+  heal(next);
+  const offer = next.offers.find((o) => o.id === id);
+  if (!offer) return g;
+  offer.clauses[key] = !offer.clauses[key];
+  offer.pay = priced(offer.basePay, offer.clauses);
+  offer.quality = offer.baseQuality + (offer.clauses.tight ? 8 : 0);
+  offer.dueWeeks = spanWeeks(offer.shape, offer.batches, offer.clauses.rush);
+  return next;
+}
+
+export function declineOffer(g: Game, id: string) {
+  const next = structuredClone(g) as Game;
+  heal(next);
+  const idx = next.offers.findIndex((o) => o.id === id);
+  if (idx < 0) return g;
+  const offer = next.offers.splice(idx, 1)[0]!;
+  const client = next.clients.find((c) => c.id === offer.clientId);
+  if (client) client.trust = clamp(client.trust - 1, 0, 100);
+  pushLog(next, `Rimandata la busta di ${offer.client}.`, "info");
+  return next;
+}
+
+export type DeskLine = { id: string; name: string; ready: boolean; fit: boolean; why: string };
+export function deskLines(g: Game, tier: Tier): DeskLine[] {
+  const rooms = g.rooms.filter((r) => r.type === "pilot" || r.type === "plant" || r.type === "sterile");
+  return rooms.map((room) => {
+    const siblings = rooms.filter((r) => r.type === room.type);
+    const index = siblings.findIndex((r) => r.id === room.id);
+    const base = roomDef(room.type).name;
+    const name = siblings.length > 1 ? `${base} ${index + 1}` : base;
+    const machine = room.type === "sterile" ? "bioreattore" : room.type === "plant" ? "reattore-gmp" : "reattore";
+    const m = room.slots.find((s) => s.item?.defId === machine)?.item?.level ?? 0;
+    const kind = room.type === "sterile" ? "sterile" : room.type === "plant" ? "plant" : "pilot";
+    const fit = m > 0 && fitsTier(tier, kind, m);
+    const live = lineOf(g, room);
+    const busy = g.jobs.some((j) => j.roomId === room.id && j.status === "active");
+    let why = "Pronta";
+    if (!m) why = room.type === "sterile" ? "Manca il bioreattore" : "Manca il reattore";
+    else if (!fit) why = tier === "premium" ? "Serve il reattore GMP almeno a 2" : "Linea non adatta";
+    else if (!roomOnline(g, room)) why = "Senza corrente";
+    else if (room.halt > 0) why = "In pausa";
+    else if (!staffIn(g, room.id, "operator").length) why = "Senza operatore";
+    else if ((kind === "plant" || kind === "sterile") && !gownOk(g)) why = "Manca lo spogliatoio";
+    else if (kind === "sterile" && !itemOn(g, "pw")) why = "Manca l'acqua purificata";
+    else if (!live) why = "Spenta";
+    else if (busy) why = "Occupata";
+    const ready = Boolean(live && fit && !busy && fitsTier(tier, live.kind, live.m));
+    return { id: room.id, name, ready, fit, why: ready ? "Pronta" : why };
+  });
+}
+
+export function pinJob(g: Game, id: string, roomId: string | null) {
+  const next = structuredClone(g) as Game;
+  heal(next);
+  const job = next.jobs.find((j) => j.id === id);
+  if (!job || job.status !== "queued") return g;
+  if (roomId && !deskLines(next, job.tier).some((line) => line.id === roomId && line.fit)) return "Quella linea non regge questo contratto.";
+  job.prefer = roomId;
   return next;
 }
 
@@ -1073,23 +1307,35 @@ function tryFill(g: Game, key: MatKey | "vials", need: number) {
 }
 
 function produce(g: Game) {
-  const lines = g.rooms.map((room) => lineOf(g, room)).filter((x) => x !== null);
+  heal(g);
   for (const job of g.jobs) {
-    if (job.status !== "queued") continue;
-    const line = lines.find((candidate) => {
-      if (!candidate) return false;
-      if (g.jobs.some((other) => other.roomId === candidate.room.id && other.status === "active")) return false;
-      if (job.tier === "sterile") return candidate.kind === "sterile";
-      if (job.tier === "premium") return candidate.kind === "plant" && candidate.m >= 2;
-      if (job.tier === "standard") return (candidate.kind === "pilot" && candidate.m >= 2) || candidate.kind === "plant";
-      return candidate.kind === "pilot" || candidate.kind === "plant";
-    });
+    if (job.done >= job.batches || g.week <= job.due) continue;
+    if (g.week <= job.due + 4) g.reputation = clamp(g.reputation - 1, 0, 100);
+    if (job.clauses.penalty && !job.lateHit) {
+      const hit = Math.round(job.pay * 0.08);
+      g.cash -= hit;
+      job.lateHit = true;
+      pushLog(g, `${job.client}: penale di ritardo ${euro(hit)}.`, "bad");
+    } else if (g.week === job.due + 1) pushLog(g, `${job.client} è oltre la data.`, "bad");
+  }
+  const lines = g.rooms.map((room) => lineOf(g, room)).filter((x) => x !== null);
+  const open = () => lines.filter((candidate) => !g.jobs.some((other) => other.roomId === candidate!.room.id && other.status === "active"));
+  for (const job of g.jobs) {
+    if (job.status !== "queued" || !job.prefer) continue;
+    const line = open().find((candidate) => candidate!.room.id === job.prefer && fitsTier(job.tier, candidate!.kind, candidate!.m));
+    if (!line) continue;
+    job.roomId = line.room.id;
+    job.status = "active";
+  }
+  for (const job of g.jobs) {
+    if (job.status !== "queued" || job.prefer) continue;
+    const line = open().find((candidate) => fitsTier(job.tier, candidate!.kind, candidate!.m));
     if (!line) continue;
     job.roomId = line.room.id;
     job.status = "active";
   }
   const blister = itemLevel(g, "blister");
-  const commercial = g.staff.some((s) => s.role === "commercial" && s.roomId && g.rooms.find((r) => r.id === s.roomId)?.type === "hq") && hasGear(g, "sala");
+  const commercial = sellerOn(g);
   for (const job of g.jobs) {
     if (job.status !== "active" || !job.roomId) continue;
     const room = g.rooms.find((r) => r.id === job.roomId);
@@ -1115,9 +1361,17 @@ function produce(g: Game) {
       if (room.slots.some((s) => s.item?.defId === "cip" && gearOn(g, room.id, room.slots.indexOf(s)))) fail -= 0.04;
       fail = clamp(fail, 0.02, 0.45);
       if (roll(g.week * 17 + job.done + g.seq) < fail) {
+        job.scrap += 1;
         g.quality = clamp(g.quality - 2, 0, 100);
         g.reputation = clamp(g.reputation - 2, 0, 100);
-        pushLog(g, `Lotto ${job.client} fuori specifica.`, "bad");
+        const client = g.clients.find((c) => c.id === job.clientId);
+        if (client) client.trust = clamp(client.trust - 2, 0, 100);
+        if (job.clauses.penalty && !job.penalScrap) {
+          const hit = Math.round((job.pay / job.batches) * 0.4);
+          g.cash -= hit;
+          job.penalScrap = true;
+          pushLog(g, `${job.client}: scarto con penale ${euro(hit)}.`, "bad");
+        } else pushLog(g, `Lotto ${job.client} fuori specifica.`, "bad");
       } else {
         job.done += 1;
         g.stats.batches += 1;
@@ -1130,14 +1384,31 @@ function produce(g: Game) {
         g.stats.revenue += slice;
         g.reputation = clamp(g.reputation + 0.5, 0, 100);
         g.quality = clamp(g.quality + 0.3, 0, 100);
-        if (job.done >= job.batches) pushLog(g, `Contratto ${job.client} chiuso.`, "good");
+        if (job.done >= job.batches) {
+          const client = g.clients.find((c) => c.id === job.clientId);
+          if (client) {
+            client.trust = clamp(client.trust + (job.scrap > 0 ? 2 : 8), 0, 100);
+            client.last = g.week;
+          }
+          if (job.science > 0) {
+            g.science += job.science;
+            pushLog(g, `${job.client}: il processo resta, +${job.science} scienza.`, "good");
+          }
+          pushLog(g, `Contratto ${job.client} chiuso.`, "good");
+          followOn(g, job);
+        }
       }
     }
   }
   g.jobs = g.jobs.filter((j) => j.done < j.batches);
 }
 
-function scienceOf(g: Game) {
+function staffSkill(g: Game, role: Role, type: RoomType) {
+  const list = g.staff.filter((s) => s.role === role && g.rooms.find((r) => r.id === s.roomId)?.type === type);
+  if (!list.length) return 0;
+  return list.reduce((sum, s) => sum + s.skill, 0) / list.length;
+}
+export function scienceRate(g: Game) {
   let n = 0;
   for (const s of g.staff) {
     if (s.role !== "scientist") continue;
@@ -1145,27 +1416,136 @@ function scienceOf(g: Game) {
     if (!room) n += 0.4;
     else if (room.type === "discovery" && roomOnline(g, room) && room.halt === 0) n += 0.35 * s.skill * itemLevel(g, "lcms");
   }
-  g.science += n;
+  return n;
+}
+function indicationOf(name: string) {
+  return INDICATION_BOOK.find((item) => item.name === name) ?? INDICATION_BOOK[0]!;
+}
+function marketMul(program: Program) {
+  return 0.92 + (indicationOf(program.indication).pull - 1) * 0.35;
+}
+export function trialRisk(g: Game, program: Program) {
+  const base = program.stage === "phase1" ? 0.1 : program.stage === "phase2" ? 0.18 : program.stage === "phase3" ? 0.26 : 0;
+  if (!base) return 0;
+  let chance = base + indicationOf(program.indication).risk * 0.45 - g.quality / 500;
+  if (hasGear(g, "biostat")) chance -= 0.06;
+  if ((program.heat ?? 0) >= 3) chance += 0.04;
+  return clamp(chance, 0.03, 0.5);
+}
+export function licenseValue(program: Program) {
+  const bonus = program.stage === "phase3" ? 700_000 : program.stage === "phase2" ? 380_000 : program.stage === "phase1" ? 180_000 : 0;
+  const rare = program.indication === "Malattie rare" ? 1.2 : 1;
+  const bio = (program.modality ?? "chimica") === "biologico" ? 1.12 : 1;
+  const heat = 1 - 0.08 * (program.heat ?? 0);
+  return Math.round((420_000 + bonus) * marketMul(program) * rare * bio * heat);
+}
+export function researchCost(g: Game, program: Program) {
+  const step = NEXT_STAGE[program.stage];
+  if (!step) return 0;
+  if (program.stage === "patent" && hasGear(g, "brevetti-desk")) return Math.round(step.cost * 0.75);
+  return step.cost;
+}
+export function researchGate(g: Game, program: Program): string | null {
+  if (!program.waiting) return null;
+  if (program.stage === "dossier") {
+    if (!hasGear(g, "dossier")) return "Serve l'archivio dossier, negli affari regolatori.";
+    if (g.cash < researchCost(g, program)) return "Cassa insufficiente.";
+    return null;
+  }
+  if (program.stage === "patent" && !g.rooms.some((r) => r.type === "phase1" && hasGear(g, "pharmacy"))) return "Prima l'unità di fase I, con la pharmacy.";
+  if (program.stage === "phase1" && !g.rooms.some((r) => r.type === "phase23" && hasGear(g, "unitdose"))) return "Prima l'unità di fase II, con l'unit dose.";
+  if (program.stage === "phase2" && !hasGear(g, "tmf")) return "La fase III chiede l'archivio TMF.";
+  if (g.cash < researchCost(g, program)) return "Cassa insufficiente.";
+  if ((program.modality ?? "chimica") === "biologico" && (program.stage === "phase1" || program.stage === "phase2")) {
+    const missing = Math.max(0, 4 - g.vials);
+    if (missing && capOf(g, "vials") < 4) return "Il biologico vuole 4 flaconi, e lo scaffale non li tiene.";
+    if (missing && !g.autoBuy && g.cash < researchCost(g, program) + missing * matPrice(g, "vials")) return "Servono 4 flaconi per il lotto clinico.";
+  }
+  return null;
+}
+function takeVials(g: Game, n: number): string | null {
+  if (g.vials >= n) {
+    g.vials -= n;
+    return null;
+  }
+  const missing = n - g.vials;
+  if (!g.autoBuy) return "Servono 4 flaconi. Comprali o accendi il riordino.";
+  if (capOf(g, "vials") < n) return "Lo scaffale flaconi non regge 4 pezzi.";
+  const cost = missing * matPrice(g, "vials");
+  if (g.cash < cost) return "Cassa corta per i flaconi del lotto clinico.";
+  g.cash -= cost;
+  g.vials -= n - missing;
+  return null;
+}
+export function labPace(g: Game, program: Program): { speed: number; need: number; text: string } {
+  const need = STAGE_NEED[program.stage] ?? 4;
+  const modality = program.modality ?? "chimica";
+  if (program.stage === "review") return { speed: 0, need: Math.max(program.reviewLeft, 0), text: program.authority ? `${program.authority} sta leggendo.` : "In lettura." };
+  if (program.stage === "patent") return { speed: 0, need: 1, text: "Il brevetto si deposita, non si aspetta." };
+  if (["failed", "launched", "licensed", "approved"].includes(program.stage)) return { speed: 0, need: 1, text: STAGE_LABEL[program.stage] };
+  if (program.waiting) return { speed: 0, need, text: "Pagina piena. Tocca a te." };
+  let speed = 0;
+  let block = "Fermo.";
+  if (program.stage === "discovery" || program.stage === "lead") {
+    const s = staffSkill(g, "scientist", "discovery");
+    if (!g.rooms.some((r) => r.type === "discovery")) block = "Manca il lab di scoperta.";
+    else if (!s) block = "Metti uno scienziato nel lab di scoperta.";
+    else if (!hasGear(g, "banco")) block = "Manca il banco chimico.";
+    else {
+      speed = 0.45 * (0.7 + 0.2 * itemLevel(g, "lcms")) * (s / 3);
+      if (program.stage === "lead" && hasGear(g, "sintetizzatore")) speed *= 1.2;
+      speed *= modality === "biologico" ? (g.focus === "biologici" ? 1.12 : 0.9) : g.focus === "biologici" ? 0.92 : 1;
+    }
+  } else if (program.stage === "preclinical") {
+    const s = staffSkill(g, "scientist", "preclinical");
+    if (!g.rooms.some((r) => r.type === "preclinical")) block = "Manca la preclinica.";
+    else if (!s) block = "Metti uno scienziato in preclinica.";
+    else if (!hasGear(g, "saggi")) block = "Manca la piattaforma saggi.";
+    else speed = 0.4 * (0.6 + 0.2 * itemLevel(g, "saggi")) * (hasGear(g, "toss") ? 1.25 : 0.8) * (s / 3);
+  } else if (program.stage === "phase1") {
+    const home = g.rooms.find((r) => r.type === "phase1");
+    const s = staffSkill(g, "clinical", "phase1");
+    if (!home) block = "Manca l'unità di fase I.";
+    else if (!s) block = "Metti un clinico in fase I.";
+    else if (!hasGear(g, "pharmacy") || !hasGear(g, "letti")) block = "Servono pharmacy e unità letti.";
+    else speed = (0.5 + 0.15 * itemLevel(g, "monitor-1") + 0.1 * home.level) * (s / 4);
+  } else if (program.stage === "phase2" || program.stage === "phase3") {
+    const home = g.rooms.find((r) => r.type === "phase23");
+    const s = staffSkill(g, "clinical", "phase23");
+    if (!home) block = "Manca l'unità di fase II e III.";
+    else if (!s) block = "Metti un clinico nell'unità clinica.";
+    else if (!hasGear(g, "unitdose")) block = "Manca l'unit dose.";
+    else if (program.stage === "phase3" && !hasGear(g, "tmf")) block = "La fase III vuole l'archivio TMF.";
+    else speed = (0.5 + 0.15 * itemLevel(g, "monitor-2") + 0.1 * home.level) * (s / 4);
+  } else if (program.stage === "dossier") {
+    const s = staffSkill(g, "regulatory", "regulatory");
+    if (!g.rooms.some((r) => r.type === "regulatory")) block = "Mancano gli affari regolatori.";
+    else if (!s) block = "Metti un regolatorio sull'archivio.";
+    else if (!hasGear(g, "dossier")) block = "Manca l'archivio dossier.";
+    else speed = 0.7 * (s / 3) * (hasGear(g, "archivio-stab") ? 1.1 : 1);
+  }
+  if (speed <= 0) return { speed: 0, need, text: block };
+  const weeks = Math.max(1, Math.ceil(Math.max(0, need - program.progress) / speed));
+  return { speed, need, text: `Ancora circa ${weeks} ${weeks === 1 ? "settimana" : "settimane"}.` };
+}
+function scienceOf(g: Game) {
+  g.science += scienceRate(g);
 }
 
 function research(g: Game) {
   scienceOf(g);
-  const skill = (role: Role, type: RoomType) => {
-    const list = g.staff.filter((s) => s.role === role && g.rooms.find((r) => r.id === s.roomId)?.type === type);
-    if (!list.length) return 0;
-    return list.reduce((sum, s) => sum + s.skill, 0) / list.length;
-  };
   for (const program of g.pipeline) {
     if (["failed", "launched", "licensed", "approved"].includes(program.stage)) continue;
     if (program.stage === "review") {
       program.reviewLeft -= 1;
       if (program.reviewLeft <= 0) {
         const authority = AUTHORITIES.find((a) => a.name === program.authority) ?? AUTHORITIES[0]!;
-        const bonus = (skill("regulatory", "regulatory") ? 0.1 : 0) + g.quality / 320 + (hasGear(g, "dossier") ? 0.06 : 0);
+        const bonus = (staffSkill(g, "regulatory", "regulatory") ? 0.1 : 0) + g.quality / 320 + (hasGear(g, "dossier") ? 0.06 : 0);
         if (roll(g.week * 5 + g.seq) > authority.strict - bonus) {
           program.stage = "approved";
           g.stats.approvals += 1;
           g.reputation = clamp(g.reputation + 8, 0, 100);
+          if (program.authority === "FDA") g.playerShare = clamp(g.playerShare + 2, 0, shareCap(g));
           pushLog(g, `${authority.name} approva ${program.code}.`, "good");
         } else {
           program.stage = "dossier";
@@ -1180,53 +1560,73 @@ function research(g: Game) {
       if (program.stage === "patent") program.waiting = true;
       continue;
     }
-    let speed = 0;
-    if (program.stage === "discovery" || program.stage === "lead") {
-      const s = skill("scientist", "discovery");
-      if (s && hasGear(g, "banco")) speed = 0.45 * (0.7 + 0.2 * itemLevel(g, "lcms")) * (s / 3);
-      if (program.stage === "lead" && hasGear(g, "sintetizzatore")) speed *= 1.2;
-    } else if (program.stage === "preclinical") {
-      const s = skill("scientist", "preclinical");
-      if (s && hasGear(g, "saggi")) speed = 0.4 * (0.6 + 0.2 * itemLevel(g, "saggi")) * (hasGear(g, "toss") ? 1.25 : 0.8) * (s / 3);
-    } else if (program.stage === "phase1") {
-      const home = g.rooms.find((r) => r.type === "phase1");
-      const s = skill("clinical", "phase1");
-      if (s && home && hasGear(g, "pharmacy") && hasGear(g, "letti")) speed = (0.5 + 0.15 * itemLevel(g, "monitor-1") + 0.1 * home.level) * (s / 4);
-    } else if (program.stage === "phase2" || program.stage === "phase3") {
-      const home = g.rooms.find((r) => r.type === "phase23");
-      const s = skill("clinical", "phase23");
-      if (s && home && hasGear(g, "unitdose") && (program.stage === "phase2" || hasGear(g, "tmf"))) {
-        speed = (0.5 + 0.15 * itemLevel(g, "monitor-2") + 0.1 * home.level) * (s / 4);
+    if (program.rivalId && (program.heat ?? 0) < 3 && ["discovery", "lead", "preclinical"].includes(program.stage)) {
+      if (roll(g.week * 19 + (program.heat ?? 0) * 3 + g.seq) < 0.04) {
+        program.heat = (program.heat ?? 0) + 1;
+        const rival = g.rivals.find((item) => item.id === program.rivalId);
+        const name = rival?.name ?? "Un rivale";
+        pushLog(g, program.heat >= 3 ? `${name} pubblica un analogo di ${program.code}.` : `${name} stringe su ${program.code}.`, program.heat >= 3 ? "bad" : "info");
       }
-    } else if (program.stage === "dossier") {
-      const s = skill("regulatory", "regulatory");
-      if (s && hasGear(g, "dossier")) speed = 0.7 * (s / 3) * (hasGear(g, "archivio-stab") ? 1.1 : 1);
     }
-    if (speed <= 0) continue;
+    const pace = labPace(g, program);
+    if (pace.speed <= 0) continue;
     if ((program.stage === "phase2" || program.stage === "phase3") && hasGear(g, "imp")) {
       if (g.api > 0) g.api -= 1;
     }
-    program.progress += speed;
-    const need = STAGE_NEED[program.stage] ?? 4;
-    if (program.progress >= need) {
-      program.progress = need;
+    program.progress += pace.speed;
+    if (program.progress >= pace.need) {
+      program.progress = pace.need;
       program.waiting = true;
       pushLog(g, `${program.code} attende una decisione: ${STAGE_LABEL[program.stage]}.`, "info");
     }
   }
 }
 
-export function startProgram(g: Game, indication: string) {
+export function pushScience(g: Game, id: string) {
+  const next = structuredClone(g) as Game;
+  heal(next);
+  const program = next.pipeline.find((p) => p.id === id);
+  if (!program || program.waiting || !["discovery", "lead", "preclinical", "dossier"].includes(program.stage)) return "Ora non si spinge col quaderno.";
+  if (labPace(next, program).speed <= 0) return labPace(next, program).text;
+  if (next.science < 4) return "Servono 4 punti scienza.";
+  next.science -= 4;
+  const need = STAGE_NEED[program.stage] ?? 4;
+  program.progress += 1.2;
+  if (program.progress >= need) {
+    program.progress = need;
+    program.waiting = true;
+    pushLog(next, `${program.code} è pronto per una decisione.`, "good");
+  } else pushLog(next, `Quaderno spinto su ${program.code}.`, "info");
+  return next;
+}
+
+export function startProgram(g: Game, indication: string, modality: Modality = "chimica") {
   if (!g.rooms.some((r) => r.type === "discovery" && staffIn(g, r.id, "scientist").length && hasGear(g, "banco"))) return "Metti uno scienziato nel lab con il banco chimico.";
   const active = g.pipeline.filter((p) => !["failed", "launched", "licensed"].includes(p.stage)).length;
   const slots = 1 + (hasTech(g, "piattaforma") ? 1 : 0);
   if (active >= slots) return "La pipeline è piena.";
   if (g.cash < 70_000) return "Cassa insufficiente.";
   const next = structuredClone(g) as Game;
+  heal(next);
   next.cash -= 70_000;
   const code = `AUR-${140 + next.pipeline.length}`;
-  next.pipeline.push({ id: nid(next, "r"), code, indication, stage: "discovery", progress: 0, waiting: false, reviewLeft: 0, authority: null, patented: false });
+  const rival = roll(next.seq + next.week) > 0.62 ? next.rivals[Math.floor(roll(next.seq * 5 + next.week) * next.rivals.length)] : null;
+  next.pipeline.push({
+    id: nid(next, "r"),
+    code,
+    indication,
+    stage: "discovery",
+    progress: 0,
+    waiting: false,
+    reviewLeft: 0,
+    authority: null,
+    patented: false,
+    modality,
+    heat: 0,
+    rivalId: rival?.id ?? null,
+  });
   pushLog(next, `${code} parte in ${indication}.`, "good");
+  if (rival) pushLog(next, `${rival.name} guarda anche ${indication}.`, "info");
   markGoals(next);
   refreshChapter(next);
   return next;
@@ -1234,14 +1634,15 @@ export function startProgram(g: Game, indication: string) {
 
 export function advanceProgram(g: Game, id: string, authorityId?: string) {
   const next = structuredClone(g) as Game;
+  heal(next);
   const program = next.pipeline.find((p) => p.id === id);
   if (!program?.waiting) return g;
   const step = NEXT_STAGE[program.stage];
   if (!step) return g;
-  let cost = step.cost;
-  if (program.stage === "patent" && hasGear(next, "brevetti-desk")) cost = Math.round(cost * 0.75);
+  const cost = researchCost(next, program);
+  const blocked = researchGate(next, program);
+  if (blocked) return blocked;
   if (program.stage === "dossier") {
-    if (!hasGear(next, "dossier")) return "Serve l'archivio dossier.";
     const authority = AUTHORITIES.find((a) => a.id === authorityId) ?? AUTHORITIES[0]!;
     if (authority.id === "fda" && !hasGear(next, "serial")) return "La FDA chiede la serializzazione.";
     if (next.cash < cost) return "Cassa insufficiente.";
@@ -1256,17 +1657,13 @@ export function advanceProgram(g: Game, id: string, authorityId?: string) {
     pushLog(next, `${program.code} è da ${authority.name}.`, "info");
     return next;
   }
-  if (program.stage === "patent") {
-    if (!next.rooms.some((r) => r.type === "phase1" && hasGear(next, "pharmacy"))) return "Prima l'unità di fase I, con la pharmacy.";
+  if ((program.modality ?? "chimica") === "biologico" && (program.stage === "phase1" || program.stage === "phase2")) {
+    const vialErr = takeVials(next, 4);
+    if (vialErr) return vialErr;
   }
-  if (program.stage === "phase1" && !next.rooms.some((r) => r.type === "phase23" && hasGear(next, "unitdose"))) return "Prima l'unità di fase II, con l'unit dose.";
-  if (program.stage === "phase2" && !hasGear(next, "tmf")) return "La fase III chiede l'archivio TMF.";
   if (next.cash < cost) return "Cassa insufficiente.";
-  const risky = program.stage === "phase1" || program.stage === "phase2" || program.stage === "phase3";
-  const base = program.stage === "phase1" ? 0.1 : program.stage === "phase2" ? 0.18 : program.stage === "phase3" ? 0.26 : 0;
-  let chance = base - next.quality / 500;
-  if (hasGear(next, "biostat")) chance -= 0.06;
-  if (risky && roll(next.week * 3 + next.seq) < chance) {
+  const chance = trialRisk(next, program);
+  if (chance && roll(next.week * 3 + next.seq) < chance) {
     next.cash -= Math.round(cost * 0.35);
     program.stage = "failed";
     program.waiting = false;
@@ -1291,8 +1688,7 @@ export function licenseOut(g: Game, id: string) {
   const next = structuredClone(g) as Game;
   const program = next.pipeline.find((p) => p.id === id);
   if (!program?.patented || ["failed", "launched", "licensed", "approved"].includes(program.stage)) return "Si cede solo una molecola brevettata ancora in sviluppo.";
-  const bonus = program.stage === "phase3" ? 700_000 : program.stage === "phase2" ? 380_000 : program.stage === "phase1" ? 180_000 : 0;
-  const pay = 420_000 + bonus;
+  const pay = licenseValue(program);
   program.stage = "licensed";
   program.waiting = false;
   next.cash += pay;
@@ -1310,7 +1706,7 @@ export function launchProduct(g: Game, id: string) {
   if (!program || program.stage !== "approved") return g;
   program.stage = "launched";
   next.products.push({ id: nid(next, "d"), code: program.code, indication: program.indication, price: 100, patented: program.patented, patentLeft: program.patented ? 48 : 0 });
-  const bump = hasTech(next, "lancio") ? 10 : 7;
+  const bump = Math.max(4, Math.round((hasTech(next, "lancio") ? 10 : 7) * marketMul(program)));
   next.playerShare = clamp(next.playerShare + bump, 0, shareCap(next));
   next.stats.launches += 1;
   pushLog(next, `${program.code} entra in commercio.`, "good");
@@ -1338,7 +1734,8 @@ function commerce(g: Game) {
   for (const product of g.products) {
     if (product.price > (hasGear(g, "gdp") ? 130 : 120)) drift -= 0.3;
     else if (product.price < 90) drift += 0.15;
-    const revenue = Math.round(g.playerShare * demandOf(g) * (product.price / 100) * 1100 * ship * serialOk);
+    const pandemic = g.mod?.label.includes("Pandemia") && product.indication === "Respiratorio" ? 1.35 : 1;
+    const revenue = Math.round(g.playerShare * demandOf(g) * (product.price / 100) * 1100 * ship * serialOk * pandemic);
     g.cash += revenue;
     g.stats.revenue += revenue;
     if (product.patentLeft > 0) {

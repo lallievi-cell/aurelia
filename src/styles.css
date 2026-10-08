@@ -49,6 +49,59 @@
   padding-bottom: max(0.4rem, env(safe-area-inset-bottom));
 }
 
+.letter {
+  background:
+    linear-gradient(90deg, rgba(27, 122, 100, 0.9), rgba(27, 122, 100, 0.9) 10px, transparent 10px),
+    linear-gradient(#fffdf8, #f3eee3);
+  border: 1px solid #e3d7c2;
+  border-radius: 1.15rem;
+  box-shadow: 0 10px 22px rgba(18, 38, 44, 0.06);
+}
+
+.letter.queue {
+  background:
+    linear-gradient(90deg, #c88812, #c88812 10px, transparent 10px),
+    linear-gradient(#fffdf8, #f3eee3);
+}
+
+.notebook {
+  background:
+    linear-gradient(90deg, rgba(168, 68, 62, 0.85), rgba(168, 68, 62, 0.85) 9px, transparent 9px),
+    repeating-linear-gradient(180deg, transparent, transparent 26px, rgba(27, 122, 100, 0.07) 27px),
+    linear-gradient(#fffdf8, #f6f1e6);
+  border: 1px solid #e4d5c4;
+  border-radius: 1.15rem;
+  box-shadow: 0 10px 22px rgba(18, 38, 44, 0.06);
+}
+
+.dossier {
+  background:
+    radial-gradient(160px 90px at 100% 0%, rgba(200, 136, 18, 0.22), transparent 62%),
+    #12262c;
+  color: #f7fbf9;
+  border-radius: 1.15rem;
+}
+
+.seal {
+  display: grid;
+  width: 2.7rem;
+  height: 2.7rem;
+  place-items: center;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #fffdf8;
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.16);
+}
+
+.seal.sm {
+  width: 1.7rem;
+  height: 1.7rem;
+  font-size: 0.5rem;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.16);
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation: none !important;

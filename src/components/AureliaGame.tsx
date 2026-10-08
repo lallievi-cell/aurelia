@@ -7,6 +7,7 @@ import {
   ERA_LABEL,
   GEAR,
   GOAL_TEXT,
+  INDICATION_BOOK,
   INDICATIONS,
   MAT_LABEL,
   NEXT_STAGE,
@@ -28,7 +29,9 @@ import {
   canPlace,
   capOf,
   coverage,
+  declineOffer,
   demandOf,
+  deskLines,
   dismiss,
   euro,
   expandRoom,
@@ -38,28 +41,40 @@ import {
   hasTech,
   hire,
   installGear,
+  labPace,
   launchProduct,
   licenseOut,
+  licenseValue,
   matPrice,
   newGame,
   orderMat,
+  pinJob,
   parcelAt,
   placeCorridor,
   placeRoom,
   powerReport,
+  pushScience,
   removeCorridor,
   removeGear,
   removeRoom,
+  researchCost,
+  researchGate,
   roomDef,
   roomOnline,
+  scienceRate,
+  sellerOn,
   setAutoBuy,
   setPrice,
+  SHAPE_LABEL,
   slotsFor,
   staffIn,
   startProgram,
   techDef,
+  TIER_LABEL,
   tick,
   train,
+  trialRisk,
+  tuneOffer,
   upgradeGear,
   upgradeRoom,
   upgradeRoomCost,
@@ -67,9 +82,14 @@ import {
   yearOf,
   type Focus,
   type Game,
+  type Job,
   type MatKey,
+  type Modality,
+  type Offer,
   type ParcelId,
+  type Program,
   type RoomType,
+  type Stage,
   type TechId,
 } from "@/tycoon/model";
 import { clearGame, loadGame, saveGame } from "@/tycoon/save";
@@ -366,8 +386,8 @@ export function AureliaGame() {
 
       <nav className="safe-bot z-20 grid grid-cols-6 border-t border-line bg-card">
         <Nav icon={<MapIcon />} label="Mappa" on={tab === "map"} click={() => setTab("map")} />
-        <Nav icon={<ScrollText />} label="Contratti" on={tab === "deals"} click={() => setTab("deals")} />
-        <Nav icon={<FlaskConical />} label="Ricerca" on={tab === "research"} click={() => setTab("research")} />
+        <Nav icon={<ScrollText />} label="Contratti" on={tab === "deals"} click={() => setTab("deals")} dot={game.offers.length > 0} />
+        <Nav icon={<FlaskConical />} label="Ricerca" on={tab === "research"} click={() => setTab("research")} dot={game.pipeline.some((item) => item.waiting)} />
         <Nav icon={<GitBranch />} label="Tecniche" on={tab === "tech"} click={() => setTab("tech")} />
         <Nav icon={<Users />} label="Persone" on={tab === "team"} click={() => setTab("team")} />
         <Nav icon={<Globe2 />} label="Mondo" on={tab === "world"} click={() => setTab("world")} />
@@ -383,10 +403,13 @@ function zoomBy(cam: Cam, canvas: HTMLCanvasElement | null, game: Game, factor: 
   cam.zoom = Math.max(0.32, Math.min(1.7, base * factor));
 }
 
-function Nav({ icon, label, on, click }: { icon: ReactNode; label: string; on: boolean; click: () => void }) {
+function Nav({ icon, label, on, click, dot }: { icon: ReactNode; label: string; on: boolean; click: () => void; dot?: boolean }) {
   return (
     <button type="button" onClick={click} className={`flex min-h-14 flex-col items-center justify-center gap-0.5 text-[10px] leading-none ${on ? "text-teal" : "text-mist"}`}>
-      <span className="[&_svg]:h-5 [&_svg]:w-5">{icon}</span>
+      <span className="relative [&_svg]:h-5 [&_svg]:w-5">
+        {icon}
+        {dot ? <span className="absolute -top-0.5 -right-1.5 h-2 w-2 rounded-full bg-amber" /> : null}
+      </span>
       {label}
     </button>
   );
@@ -611,91 +634,342 @@ function GearChoices({ game, roomType, roomId, index, apply }: { game: Game; roo
   );
 }
 
+const TIER_INK: Record<Offer["tier"], string> = { pilota: "#c88812", standard: "#1b7a64", premium: "#8a4e12", sterile: "#2c5d78" };
+const TIER_SEAL: Record<Offer["tier"], string> = { pilota: "PIL", standard: "STD", premium: "SCA", sterile: "STE" };
+const CLAUSES: { key: "rush" | "tight" | "penalty"; name: string; text: string }[] = [
+  { key: "rush", name: "Termine stretto", text: "Due settimane in meno. Paga +14%." },
+  { key: "tight", name: "Specifica stretta", text: "Qualità chiesta +8. Paga +10%." },
+  { key: "penalty", name: "Penale", text: "Il primo scarto o il ritardo costa. Paga +8%." },
+];
+
 function Deals({ game, apply }: { game: Game; apply: (g: Game | string) => void }) {
-  const active = game.jobs;
+  const [open, setOpen] = useState<string | null>(null);
+  const clients = game.clients ?? [];
+  const jobs = [...game.jobs].sort((a, b) => (a.status === b.status ? (a.due ?? 0) - (b.due ?? 0) : a.status === "active" ? -1 : 1));
+  const offers = [...game.offers].sort((a, b) => a.expires - b.expires);
   return (
-    <div className="mx-auto grid max-w-lg gap-4">
-      <h2 className="font-display text-3xl">Contratti</h2>
-      <p className="text-sm text-mist">
-        API {game.api}/{capOf(game, "api")} · solvente {game.solvent}/{capOf(game, "solvent")} · eccipiente {game.eccipient}/{capOf(game, "eccipient")} · flaconi {game.vials}/{capOf(game, "vials")}
-      </p>
-      <button type="button" className="min-h-11 rounded-full bg-paper" onClick={() => apply(setAutoBuy(game, !game.autoBuy))}>
-        {game.autoBuy ? "Riordino automatico acceso" : "Riordino spento"}
-      </button>
-      <div className="grid grid-cols-2 gap-2">
-        <button type="button" className="min-h-11 rounded-full bg-teal text-card" onClick={() => apply(orderMat(game, "api", 8))}>API +8</button>
-        <button type="button" className="min-h-11 rounded-full bg-teal text-card" onClick={() => apply(orderMat(game, "solvent", 8))}>Solvente +8</button>
-        <button type="button" className="min-h-11 rounded-full bg-paper" onClick={() => apply(orderMat(game, "eccipient", 8))}>Eccipiente +8</button>
-        <button type="button" className="min-h-11 rounded-full bg-paper" onClick={() => apply(orderMat(game, "vials", 6))}>Flaconi +6</button>
-      </div>
-      {game.offers.map((offer) => (
-        <article key={offer.id} className="rounded-xl border border-line bg-card p-3">
-          <p className="font-medium">{offer.title}</p>
-          <p className="text-sm text-mist">
-            {offer.tier} · {offer.batches} lotti · qualità chiesta {offer.quality} · API {offer.api} solvente {offer.solvent} flaconi {offer.vials}
-          </p>
-          <p className="mt-1 font-display text-xl text-teal">{euro(offer.pay)}</p>
-          <button type="button" className="mt-2 min-h-11 w-full rounded-full bg-teal text-card" onClick={() => apply(acceptOffer(game, offer.id))}>
-            Firma
-          </button>
-        </article>
-      ))}
-      <h3 className="font-display text-2xl">In corso</h3>
-      {active.length ? active.map((job) => (
-        <p key={job.id} className="rounded-xl bg-card px-3 py-2 text-sm">
-          {job.client} · {job.status === "queued" ? "in cerca di una linea collegata, accesa e con operatore" : `lotto ${job.done}/${job.batches}`}
+    <div className="mx-auto grid max-w-lg gap-5">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal">Sala</p>
+        <h2 className="font-display text-4xl leading-none">Contratti</h2>
+        <p className="mt-2 text-sm leading-snug text-mist">
+          {sellerOn(game) ? "La sala tiene quattro buste e alza l'incasso di ogni lotto." : "Tre buste alla volta. Con la sala e un commerciale diventano quattro, e pagano meglio."}
         </p>
-      )) : <p className="text-sm text-mist">Nessun contratto aperto.</p>}
+      </div>
+
+      <section className="grid gap-2">
+        <h3 className="font-display text-2xl">In macchina</h3>
+        {jobs.length ? jobs.map((job) => <JobCard key={job.id} game={game} job={job} apply={apply} />) : <p className="rounded-2xl border border-dashed border-line px-3 py-4 text-sm text-mist">Nessun lotto in macchina. Firma una busta.</p>}
+      </section>
+
+      <section className="grid gap-3">
+        <h3 className="font-display text-2xl">Sul tavolo</h3>
+        {offers.length ? offers.map((offer) => (
+          <Letter key={offer.id} game={game} offer={offer} open={open === offer.id} apply={apply} toggle={() => setOpen(open === offer.id ? null : offer.id)} signed={() => setOpen(null)} />
+        )) : <p className="text-sm text-mist">Il tavolo è vuoto. Le case riscrivono entro un paio di settimane.</p>}
+      </section>
+
+      <section className="grid gap-2">
+        <h3 className="font-display text-2xl">Le case</h3>
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+          {clients.map((client) => (
+            <div key={client.id} className="flex w-28 shrink-0 flex-col gap-1 rounded-2xl border border-line bg-card px-2 py-2">
+              <span className="seal sm" style={{ background: TIER_INK[client.taste] }}>{TIER_SEAL[client.taste]}</span>
+              <span className="truncate text-sm font-medium">{client.name}</span>
+              <TrustPips trust={client.trust} />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-line bg-card p-3">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="font-display text-xl">Scaffali</h3>
+          <button type="button" className="min-h-11 rounded-full bg-paper px-3 text-sm" onClick={() => apply(setAutoBuy(game, !game.autoBuy))}>
+            {game.autoBuy ? "Riordino acceso" : "Riordino spento"}
+          </button>
+        </div>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <OrderButton label="API" have={game.api} cap={capOf(game, "api")} onClick={() => apply(orderMat(game, "api", 8))} />
+          <OrderButton label="Solvente" have={game.solvent} cap={capOf(game, "solvent")} onClick={() => apply(orderMat(game, "solvent", 8))} />
+          <OrderButton label="Eccipiente" have={game.eccipient} cap={capOf(game, "eccipient")} onClick={() => apply(orderMat(game, "eccipient", 8))} />
+          <OrderButton label="Flaconi" have={game.vials} cap={capOf(game, "vials")} onClick={() => apply(orderMat(game, "vials", 6))} />
+        </div>
+      </section>
     </div>
   );
 }
 
-function Research({ game, apply, indication, setIndication }: { game: Game; apply: (g: Game | string) => void; indication: string; setIndication: (v: string) => void }) {
+function TrustPips({ trust }: { trust: number }) {
+  const n = Math.max(0, Math.min(5, Math.round(trust / 20)));
   return (
-    <div className="mx-auto grid max-w-lg gap-4">
-      <h2 className="font-display text-3xl">Ricerca</h2>
-      <div className="rounded-xl border border-line bg-card p-3">
-        <label className="text-sm text-mist">
-          Indicazione
-          <select value={indication} onChange={(e) => setIndication(e.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-line bg-paper px-2">
-            {INDICATIONS.map((item) => <option key={item}>{item}</option>)}
-          </select>
-        </label>
-        <button type="button" className="mt-3 min-h-11 w-full rounded-full bg-teal text-card" onClick={() => apply(startProgram(game, indication))}>
-          Nuova molecola · 70 mila €
-        </button>
-      </div>
-      {game.pipeline.map((program) => {
-        const step = NEXT_STAGE[program.stage];
-        return (
-          <article key={program.id} className="rounded-xl border border-line bg-card p-3">
-            <p className="font-display text-xl">{program.code}</p>
-            <p className="text-sm text-mist">{program.indication} · {STAGE_LABEL[program.stage]}{program.patented ? " · brevettata" : ""}</p>
-            {program.waiting && step && program.stage !== "dossier" ? (
-              <button type="button" className="mt-3 min-h-11 w-full rounded-full bg-ink text-card" onClick={() => apply(advanceProgram(game, program.id))}>
-                {step.label}{step.cost ? ` · ${euro(step.cost)}` : ""}
-              </button>
-            ) : null}
-            {program.waiting && program.stage === "dossier" ? (
-              <div className="mt-3 grid gap-2">
-                {AUTHORITIES.map((authority) => (
-                  <button key={authority.id} type="button" className="min-h-11 rounded-full bg-ink text-card" onClick={() => apply(advanceProgram(game, program.id, authority.id))}>
-                    Invia a {authority.name}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-            {program.stage === "review" ? <p className="mt-2 text-sm">{program.authority}: {program.reviewLeft} sett.</p> : null}
-            {program.stage === "approved" ? (
-              <button type="button" className="mt-3 min-h-11 w-full rounded-full bg-teal text-card" onClick={() => apply(launchProduct(game, program.id))}>Lancia</button>
-            ) : null}
-            {program.patented && !["failed", "launched", "licensed", "approved"].includes(program.stage) ? (
-              <button type="button" className="mt-2 min-h-11 w-full rounded-full bg-paper" onClick={() => apply(licenseOut(game, program.id))}>Cedi in licenza</button>
-            ) : null}
-          </article>
-        );
+    <span className="mt-1 flex gap-0.5" aria-label={`fiducia ${n} su 5`}>
+      {Array.from({ length: 5 }, (_, i) => <span key={i} className={`h-1.5 w-2 rounded-full ${i < n ? "bg-teal" : "bg-line"}`} />)}
+    </span>
+  );
+}
+
+function OrderButton({ label, have, cap, onClick }: { label: string; have: number; cap: number; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className="min-h-11 rounded-xl bg-paper px-2 text-left text-sm">
+      <span className="block font-medium">{label} +</span>
+      <span className="text-mist">{have}/{cap}</span>
+    </button>
+  );
+}
+
+function BatchRail({ job, light }: { job: Job; light?: boolean }) {
+  const done = job.done ?? 0;
+  const progress = job.progress ?? 0;
+  return (
+    <div className="flex gap-1.5">
+      {Array.from({ length: job.batches }, (_, i) => {
+        const pct = i < done ? 100 : i === done ? Math.round(Math.min(1, progress) * 100) : 0;
+        const ink = light ? "#e7c27a" : "#1b7a64";
+        const rest = light ? "rgba(255,255,255,0.16)" : "rgba(18,38,44,0.1)";
+        return <span key={i} className="h-2.5 flex-1 rounded-full" style={{ background: `linear-gradient(90deg, ${ink} ${pct}%, ${rest} ${pct}%)` }} />;
       })}
     </div>
+  );
+}
+
+function dueLabel(game: Game, job: Job) {
+  const due = job.due ?? game.week + (job.dueWeeks ?? 8);
+  const left = due - game.week;
+  if (left > 1) return `entro ${left} sett.`;
+  if (left === 1) return "entro una settimana";
+  if (left === 0) return "scade questa settimana";
+  return left === -1 ? "in ritardo di una settimana" : `in ritardo di ${-left} sett.`;
+}
+
+function JobCard({ game, job, apply }: { game: Game; job: Job; apply: (g: Game | string) => void }) {
+  const late = game.week > (job.due ?? game.week);
+  const room = game.rooms.find((r) => r.id === job.roomId);
+  const lines = deskLines(game, job.tier).filter((line) => line.fit);
+  if (job.status === "active") {
+    return (
+      <article className="dossier px-4 py-3">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber">In linea · {TIER_LABEL[job.tier]}</p>
+        <div className="mt-1 flex items-end justify-between gap-3">
+          <h4 className="font-display text-2xl leading-none">{job.client}</h4>
+          <p className="text-sm">{job.done}/{job.batches}</p>
+        </div>
+        <div className="mt-3"><BatchRail job={job} light /></div>
+        <p className={`mt-2 text-sm ${late ? "text-amber" : "text-white/70"}`}>
+          {room ? roomDef(room.type).name : "Linea"} · {dueLabel(game, job)}
+          {job.scrap ? ` · ${job.scrap} scarti` : ""}
+        </p>
+      </article>
+    );
+  }
+  return (
+    <article className="letter queue px-4 py-3 pl-5">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber">In coda · {SHAPE_LABEL[job.shape] ?? TIER_LABEL[job.tier]}</p>
+      <h4 className="mt-1 font-display text-2xl leading-none">{job.client}</h4>
+      <p className={`mt-1 text-sm ${late ? "text-amber" : "text-mist"}`}>{dueLabel(game, job)}{job.prefer ? "" : " · prima linea libera"}</p>
+      {lines.length ? (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          <button type="button" className={`min-h-11 rounded-full px-3 text-sm ${job.prefer ? "bg-card" : "bg-ink text-card"}`} onClick={() => apply(pinJob(game, job.id, null))}>Prima libera</button>
+          {lines.map((line) => (
+            <button key={line.id} type="button" className={`min-h-11 rounded-full px-3 text-left text-sm ${job.prefer === line.id ? "bg-ink text-card" : "bg-card"}`} onClick={() => apply(pinJob(game, job.id, line.id))}>
+              {line.name}
+              <span className="block text-[10px] opacity-70">{line.why}</span>
+            </button>
+          ))}
+        </div>
+      ) : <p className="mt-2 text-sm text-mist">Resta fermo finché non costruisci la linea giusta.</p>}
+    </article>
+  );
+}
+
+function Letter({ game, offer, open, apply, toggle, signed }: { game: Game; offer: Offer; open: boolean; apply: (g: Game | string) => void; toggle: () => void; signed: () => void }) {
+  const client = game.clients?.find((c) => c.id === offer.clientId);
+  const clauses = offer.clauses ?? { rush: false, tight: false, penalty: false };
+  const left = Math.max(0, offer.expires - game.week);
+  const mats = (["api", "solvent", "eccipient", "vials"] as const).filter((key) => offer[key] > 0);
+  const gap = offer.quality - coverage(game);
+  const lines = deskLines(game, offer.tier);
+  const ready = lines.filter((line) => line.ready);
+  const fit = ready.length ? `${ready[0]!.name} può prenderlo.` : lines.some((line) => line.fit) ? "La linea c'è, ma non è pronta: il contratto aspetta in coda." : "Non hai ancora la linea. Firmare lo mette in coda.";
+  const spec = gap > 12 ? "Specifica sopra il QC: più scarti." : gap > 2 ? "Specifica appena sopra la copertura." : "Il QC copre la specifica.";
+  return (
+    <article className="letter px-4 py-3 pl-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-teal">{SHAPE_LABEL[offer.shape] ?? "Busta"} · {TIER_LABEL[offer.tier]}</p>
+          <h4 className="mt-1 font-display text-3xl leading-none">{offer.client}</h4>
+          {client ? <p className="mt-1 text-sm text-mist">{client.note}</p> : null}
+        </div>
+        <span className="seal shrink-0" style={{ background: TIER_INK[offer.tier] }}>{TIER_SEAL[offer.tier]}</span>
+      </div>
+      <p className="mt-3 text-sm leading-snug">{offer.blurb}</p>
+      <p className="mt-2 font-display text-3xl leading-none text-teal">{euro(offer.pay)}</p>
+      <p className="mt-1 text-sm text-mist">
+        {offer.batches} lotti · {offer.dueWeeks ?? 8} sett. · qualità {offer.quality}
+        {offer.science ? ` · +${offer.science} scienza` : ""}
+      </p>
+      <p className={`mt-1 text-sm ${left <= 2 ? "text-amber" : "text-mist"}`}>{left <= 1 ? "Ultima settimana sul tavolo" : `Sparisce tra ${left} sett.`}</p>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {mats.map((key) => <span key={key} className="rounded-full bg-card px-2 py-1 text-xs text-mist">{MAT_LABEL[key]} {offer[key]}</span>)}
+        {clauses.rush ? <span className="rounded-full bg-ink px-2 py-1 text-xs text-card">Stretto</span> : null}
+        {clauses.tight ? <span className="rounded-full bg-ink px-2 py-1 text-xs text-card">Specifica</span> : null}
+        {clauses.penalty ? <span className="rounded-full bg-ink px-2 py-1 text-xs text-card">Penale</span> : null}
+      </div>
+      {open ? (
+        <div className="mt-3 grid gap-2">
+          {CLAUSES.map((clause) => (
+            <button key={clause.key} type="button" aria-pressed={clauses[clause.key]} className={`min-h-14 rounded-xl px-3 text-left ${clauses[clause.key] ? "bg-ink text-card" : "bg-card"}`} onClick={() => apply(tuneOffer(game, offer.id, clause.key))}>
+              <span className="block text-sm font-medium">{clause.name}</span>
+              <span className={`block text-xs ${clauses[clause.key] ? "text-white/70" : "text-mist"}`}>{clause.text}</span>
+            </button>
+          ))}
+          <p className="text-sm text-mist">{fit} {spec}</p>
+          <button type="button" className="min-h-12 rounded-full bg-teal font-semibold text-card" onClick={() => { signed(); apply(acceptOffer(game, offer.id)); }}>Firma così</button>
+          <button type="button" className="min-h-11 rounded-full text-sm text-mist" onClick={() => { signed(); apply(declineOffer(game, offer.id)); }}>Rimanda la busta</button>
+        </div>
+      ) : (
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button type="button" className="min-h-11 rounded-full bg-paper text-sm" onClick={toggle}>Tratta</button>
+          <button type="button" className="min-h-11 rounded-full bg-teal font-semibold text-card" onClick={() => apply(acceptOffer(game, offer.id))}>Firma</button>
+        </div>
+      )}
+    </article>
+  );
+}
+
+const TRACK: Stage[] = ["discovery", "lead", "preclinical", "patent", "phase1", "phase2", "phase3", "dossier", "review"];
+
+function trackAt(stage: Stage) {
+  if (stage === "approved" || stage === "launched") return TRACK.length;
+  return TRACK.indexOf(stage);
+}
+
+function Research({ game, apply, indication, setIndication }: { game: Game; apply: (g: Game | string) => void; indication: string; setIndication: (v: string) => void }) {
+  const [modality, setModality] = useState<Modality>("chimica");
+  const picked = INDICATION_BOOK.find((item) => item.name === indication) ?? INDICATION_BOOK[0]!;
+  const slots = 1 + (hasTech(game, "piattaforma") ? 1 : 0);
+  const active = game.pipeline.filter((item) => !["failed", "launched", "licensed"].includes(item.stage)).length;
+  const labReady = game.rooms.some((room) => room.type === "discovery" && staffIn(game, room.id, "scientist").length > 0 && hasGear(game, "banco"));
+  const rate = scienceRate(game);
+  const open = game.pipeline.filter((item) => !["failed", "launched", "licensed"].includes(item.stage)).sort((a, b) => Number(b.waiting) - Number(a.waiting));
+  const closed = game.pipeline.filter((item) => ["failed", "launched", "licensed"].includes(item.stage));
+  return (
+    <div className="mx-auto grid max-w-lg gap-5">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal">Quaderno</p>
+        <h2 className="font-display text-4xl leading-none">Ricerca</h2>
+        <p className="mt-2 text-sm leading-snug text-mist">I contratti pagano il laboratorio. La qualità dei lotti entra nei trial. La scienza sblocca le tecniche, oppure spinge una pagina.</p>
+      </div>
+
+      <section className="notebook px-4 py-3 pl-5">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-teal">Nuova pagina</p>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <button type="button" className={`min-h-11 rounded-full text-sm ${modality === "chimica" ? "bg-ink text-card" : "bg-card"}`} onClick={() => setModality("chimica")}>Chimica</button>
+          <button type="button" className={`min-h-11 rounded-full text-sm ${modality === "biologico" ? "bg-ink text-card" : "bg-card"}`} onClick={() => setModality("biologico")}>Biologico</button>
+        </div>
+        <p className="mt-2 text-sm text-mist">{modality === "chimica" ? "Il banco che hai. Se sei partito dai biologici, la scoperta è un filo più lenta." : "Più svelta se sei partito dai biologici. In fase II e III chiede 4 flaconi."}</p>
+        <div className="-mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1">
+          {INDICATION_BOOK.map((item) => (
+            <button key={item.name} type="button" className={`min-h-11 shrink-0 rounded-full px-3 text-sm ${item.name === picked.name ? "bg-teal text-card" : "bg-card"}`} onClick={() => setIndication(item.name)}>
+              {item.name}
+            </button>
+          ))}
+        </div>
+        <h3 className="mt-3 font-display text-3xl leading-none">{picked.name}</h3>
+        <p className="mt-1 text-sm">{picked.note}</p>
+        <p className="mt-1 text-sm text-mist">Trial {picked.risk >= 0.16 ? "alto" : picked.risk >= 0.11 ? "medio" : "basso"} · mercato {picked.pull >= 1.25 ? "grosso" : picked.pull >= 1.05 ? "largo" : "stretto"}</p>
+        <p className="mt-2 text-sm text-mist">Pagine {active}/{slots} · scienza {Math.floor(game.science)} · circa {rate.toFixed(1).replace(".", ",")} a settimana</p>
+        {!labReady ? <p className="mt-2 text-sm text-amber">Serve il lab di scoperta, il banco chimico e uno scienziato dentro.</p> : null}
+        <button type="button" className="mt-3 min-h-12 w-full rounded-full bg-teal font-semibold text-card" onClick={() => apply(startProgram(game, picked.name, modality))}>Apri la pagina · 70 mila €</button>
+      </section>
+
+      <section className="grid gap-3">
+        <h3 className="font-display text-2xl">Pagine aperte</h3>
+        {open.length ? open.map((program) => <StudyPage key={program.id} game={game} program={program} apply={apply} />) : <p className="rounded-2xl border border-dashed border-line px-3 py-4 text-sm text-mist">Il quaderno è vuoto. La prima pagina costa 70 mila €.</p>}
+      </section>
+
+      {closed.length ? (
+        <section className="grid gap-2">
+          <h3 className="font-display text-2xl">Archivio</h3>
+          {closed.map((program) => {
+            const product = game.products.find((item) => item.code === program.code);
+            return (
+              <article key={program.id} className="rounded-2xl border border-line bg-card px-3 py-2">
+                <p className="font-medium">{program.code} · {program.indication}</p>
+                <p className="text-sm text-mist">
+                  {program.stage === "licensed" ? "Ceduta. I diritti non sono più tuoi." : program.stage === "failed" ? "Ferma. Il trial non ha retto." : `In commercio${product?.patentLeft ? ` · brevetto ${product.patentLeft} sett.` : ""}. Il prezzo sta in Mondo.`}
+                </p>
+              </article>
+            );
+          })}
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
+function StudyPage({ game, program, apply }: { game: Game; program: Program; apply: (g: Game | string) => void }) {
+  const pace = labPace(game, program);
+  const step = NEXT_STAGE[program.stage];
+  const at = trackAt(program.stage);
+  const pct = pace.need > 0 ? Math.max(0, Math.min(100, (program.progress / pace.need) * 100)) : 0;
+  const rival = game.rivals.find((item) => item.id === program.rivalId);
+  const risk = trialRisk(game, program);
+  const gate = researchGate(game, program);
+  const cost = researchCost(game, program);
+  const canPush = !program.waiting && ["discovery", "lead", "preclinical", "dossier"].includes(program.stage);
+  const book = INDICATION_BOOK.find((item) => item.name === program.indication);
+  return (
+    <article className="notebook px-4 py-3 pl-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-teal">{STAGE_LABEL[program.stage]} · {(program.modality ?? "chimica") === "biologico" ? "Biologico" : "Chimica"}</p>
+          <h4 className="mt-1 font-display text-3xl leading-none">{program.code}</h4>
+          <p className="mt-1 text-sm text-mist">{program.indication}{program.patented ? " · brevettata" : ""}</p>
+        </div>
+        <span className="seal shrink-0" style={{ background: "#1b7a64" }}>{program.code.slice(-3)}</span>
+      </div>
+      {book ? <p className="mt-2 text-sm">{book.note}</p> : null}
+      <div className="mt-3 flex gap-1">
+        {TRACK.map((stage, index) => <span key={stage} className={`h-1.5 flex-1 rounded-full ${at > index ? "bg-teal" : at === index ? "bg-amber" : "bg-line"}`} />)}
+      </div>
+      {program.stage !== "review" && program.stage !== "approved" ? (
+        <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/70">
+          <div className={`h-full ${program.waiting ? "bg-amber" : "bg-teal"}`} style={{ width: `${program.waiting ? 100 : pct}%` }} />
+        </div>
+      ) : null}
+      <p className="mt-2 text-sm">{pace.text}</p>
+      {rival ? <p className="mt-1 text-sm text-amber">{rival.name} è sulla stessa indicazione · pressione {program.heat ?? 0}/3</p> : null}
+      {program.stage === "approved" ? <button type="button" className="mt-3 min-h-12 w-full rounded-full bg-teal font-semibold text-card" onClick={() => apply(launchProduct(game, program.id))}>Metti in commercio</button> : null}
+      {program.waiting && step && program.stage !== "dossier" ? (
+        <div className="mt-3 grid gap-2">
+          {risk > 0 ? <p className="text-sm">Rischio di fermarsi {Math.round(risk * 100)}%. La qualità dei lotti lo abbassa.</p> : null}
+          {(program.modality ?? "chimica") === "biologico" && (program.stage === "phase1" || program.stage === "phase2") ? <p className="text-sm text-mist">Il passaggio chiede 4 flaconi.</p> : null}
+          {gate ? <p className="text-sm text-amber">{gate}</p> : null}
+          <button type="button" className="min-h-12 rounded-full bg-ink font-semibold text-card" onClick={() => apply(advanceProgram(game, program.id))}>
+            {step.label}{cost ? ` · ${euro(cost)}` : ""}
+          </button>
+        </div>
+      ) : null}
+      {program.waiting && program.stage === "dossier" ? (
+        <div className="mt-3 grid gap-2">
+          {gate ? <p className="text-sm text-amber">{gate}</p> : <p className="text-sm text-mist">Un regolatorio in stanza e il dossier a livello 2 accorciano l'attesa. Costo {euro(cost)}.</p>}
+          {AUTHORITIES.map((authority) => (
+            <button key={authority.id} type="button" className="min-h-14 rounded-xl bg-card px-3 text-left" onClick={() => apply(advanceProgram(game, program.id, authority.id))}>
+              <span className="block text-sm font-medium">{authority.name} · {authority.weeks} sett.</span>
+              <span className="block text-xs text-mist">{authority.blurb}</span>
+              {authority.id === "fda" && !hasGear(game, "serial") ? <span className="block text-xs text-amber">Prima la serializzazione.</span> : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {canPush ? (
+        <button type="button" className="mt-3 min-h-11 w-full rounded-full bg-card text-sm" onClick={() => apply(pushScience(game, program.id))}>Spingi con 4 scienza</button>
+      ) : null}
+      {program.patented && !["failed", "launched", "licensed", "approved"].includes(program.stage) ? (
+        <button type="button" className="mt-2 min-h-11 w-full rounded-full bg-paper text-sm" onClick={() => apply(licenseOut(game, program.id))}>Cedi · {euro(licenseValue(program))}</button>
+      ) : null}
+    </article>
   );
 }
 
