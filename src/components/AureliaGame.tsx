@@ -314,7 +314,7 @@ export function AureliaGame() {
         )}
 
         {tab === "map" && !room && !cell && goal ? (
-          <div className="pointer-events-none absolute left-3 right-16 top-3 rounded-xl bg-card/95 px-3 py-2 shadow-sm">
+          <div className="pointer-events-none absolute bottom-3 left-3 max-w-[70%] rounded-xl bg-card/95 px-3 py-2 shadow-sm">
             <p className="text-sm text-mist">Prossimo passo · {game.chapter}</p>
             <p className="font-medium">{goal.label}</p>
             <p className="text-sm text-mist">{CHAPTER_BLURB[game.chapter]}</p>
