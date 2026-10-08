@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ArrowLeft,
   FlaskConical,
+  GitBranch,
   Globe2,
   Map as MapIcon,
   Minus,
@@ -13,15 +14,18 @@ import {
   X,
 } from "lucide-react";
 import { blip, unlockAudio } from "@/tycoon/audio";
-import { drawCampus, drawInterior, pickStation, pickTile, type Cam } from "@/tycoon/draw";
+import { drawCampus, drawInterior, fitZoom, pickStation, pickTile, type Cam } from "@/tycoon/draw";
 import {
   AUTHORITIES,
   CATALOG,
+  CHAPTER_BLURB,
+  ERA_LABEL,
   GOAL_TEXT,
   INDICATIONS,
   NEXT_STAGE,
   ROLE_LABEL,
   STAGE_LABEL,
+  TECH,
   acceptOffer,
   advanceProgram,
   allBuildings,
@@ -30,32 +34,41 @@ import {
   audit,
   buildCost,
   buildingById,
+  buyTech,
   canBuild,
   capacityApi,
+  capacityDry,
+  capacityVials,
   catalog,
   demandOf,
   dismiss,
   euro,
+  hasTech,
   hire,
   launchProduct,
+  levelCap,
+  licenseOut,
+  matPrice,
   newGame,
-  orderApi,
+  orderMat,
   place,
   setAutoBuy,
   setPrice,
   staffIn,
   startProgram,
   tick,
+  train,
   upgrade,
   upgradeCost,
   waitingProgram,
   yearOf,
   type Focus,
   type Game,
+  type TechId,
 } from "@/tycoon/model";
 import { clearGame, loadGame, saveGame } from "@/tycoon/save";
 
-type Tab = "map" | "deals" | "research" | "team" | "world";
+type Tab = "map" | "deals" | "research" | "tech" | "team" | "world";
 
 function commit(game: Game, setGame: (g: Game) => void) {
   saveGame(game);
@@ -200,7 +213,7 @@ export function AureliaGame() {
     if (!hit) return;
     const plot = game.cells[hit.r]![hit.c]!;
     if (plot.blocked) {
-      setToast("Il cortile resta verde.");
+      setToast(plot.ground === "water" ? "Qui c'è il bacino." : plot.ground === "road" ? "La strada resta libera." : "Il cortile resta verde.");
       return;
     }
     if (plot.building) {
@@ -228,7 +241,7 @@ export function AureliaGame() {
             <p className="text-sm font-semibold uppercase tracking-widest text-teal">CDMO</p>
             <h1 className="font-display text-5xl leading-none">Aurelia</h1>
             <p className="mt-3 text-base leading-relaxed text-mist">
-              Fondi un'azienda che produce farmaci per altri. Poi costruisci i laboratori, i brevetti e un farmaco tuo.
+              Parti come CDMO: lotti piccoli, magazzino, persone. Poi laboratorio, brevetti, clinica e un farmaco tuo. La partita dura anni di gioco.
             </p>
           </div>
           <label className="block">
@@ -282,10 +295,12 @@ export function AureliaGame() {
           {playing ? <Pause /> : <Play />}
         </button>
       </header>
-      <div className="flex items-center justify-between gap-3 border-b border-line bg-card px-3 py-1 text-sm text-mist">
-        <span>Reputazione {Math.round(game.reputation)}</span>
-        <span>Qualità {Math.round(game.quality)}</span>
+      <div className="grid grid-cols-5 gap-1 border-b border-line bg-card px-2 py-1 text-center text-[11px] text-mist">
+        <span>Rep. {Math.round(game.reputation)}</span>
+        <span>Qual. {Math.round(game.quality)}</span>
         <span>Quota {Math.round(game.playerShare)}%</span>
+        <span>API {game.api}</span>
+        <span>Sci. {Math.floor(game.science)}</span>
       </div>
 
       <main className="relative min-h-0 flex-1">
@@ -303,6 +318,7 @@ export function AureliaGame() {
             {tab === "research" ? (
               <Research game={game} apply={apply} indication={indication} setIndication={setIndication} />
             ) : null}
+            {tab === "tech" ? <TechTree game={game} apply={apply} /> : null}
             {tab === "team" ? <Team game={game} apply={apply} /> : null}
             {tab === "world" ? (
               <World
@@ -327,17 +343,18 @@ export function AureliaGame() {
 
         {tab === "map" && !interior && !cell && goal ? (
           <div className="pointer-events-none absolute left-3 right-3 top-3 rounded-xl bg-card/95 px-3 py-2 shadow-sm">
-            <p className="text-sm text-mist">Prossimo passo</p>
+            <p className="text-sm text-mist">Prossimo passo · {game.chapter}</p>
             <p className="font-medium">{goal.label}</p>
+            <p className="text-sm text-mist">{CHAPTER_BLURB[game.chapter]}</p>
           </div>
         ) : null}
 
         {tab === "map" && !interior ? (
           <div className="absolute bottom-3 right-3 flex flex-col gap-2">
-            <button type="button" aria-label="Avvicina" className="grid h-11 w-11 place-items-center rounded-full bg-card shadow-sm" onClick={() => zoom(cam.current, 1.12)}>
+            <button type="button" aria-label="Avvicina" className="grid h-11 w-11 place-items-center rounded-full bg-card shadow-sm" onClick={() => zoomBy(cam.current, canvasRef.current, 1.12)}>
               <Plus />
             </button>
-            <button type="button" aria-label="Allontana" className="grid h-11 w-11 place-items-center rounded-full bg-card shadow-sm" onClick={() => zoom(cam.current, 0.88)}>
+            <button type="button" aria-label="Allontana" className="grid h-11 w-11 place-items-center rounded-full bg-card shadow-sm" onClick={() => zoomBy(cam.current, canvasRef.current, 0.88)}>
               <Minus />
             </button>
           </div>
@@ -360,7 +377,6 @@ export function AureliaGame() {
                   <button
                     key={item.kind}
                     type="button"
-                    disabled={!!block && block !== "Cassa insufficiente." ? false : false}
                     onClick={() => {
                       const result = place(game, item.kind, cell.c, cell.r);
                       if (typeof result === "string") setToast(result);
@@ -373,7 +389,7 @@ export function AureliaGame() {
                   >
                     <span>
                       <span className="block font-medium">{item.name}</span>
-                      <span className="block text-sm text-mist">{item.blurb}</span>
+                      <span className="block text-sm text-mist">{block && block !== "Cassa insufficiente." ? block : item.blurb}</span>
                     </span>
                     <span className="shrink-0 font-display text-amber">{euro(cost)}</span>
                   </button>
@@ -397,10 +413,11 @@ export function AureliaGame() {
         ) : null}
       </main>
 
-      <nav className="safe-bot z-20 grid grid-cols-5 border-t border-line bg-card">
+      <nav className="safe-bot z-20 grid grid-cols-6 border-t border-line bg-card">
         <Nav icon={<MapIcon />} label="Mappa" on={tab === "map"} click={() => setTab("map")} />
         <Nav icon={<ScrollText />} label="Contratti" on={tab === "deals"} click={() => setTab("deals")} />
         <Nav icon={<FlaskConical />} label="Ricerca" on={tab === "research"} click={() => setTab("research")} />
+        <Nav icon={<GitBranch />} label="Tecniche" on={tab === "tech"} click={() => setTab("tech")} />
         <Nav icon={<Users />} label="Persone" on={tab === "team"} click={() => setTab("team")} />
         <Nav icon={<Globe2 />} label="Mondo" on={tab === "world"} click={() => setTab("world")} />
       </nav>
@@ -408,16 +425,17 @@ export function AureliaGame() {
   );
 }
 
-function zoom(cam: Cam, factor: number) {
-  const base = cam.user ? cam.zoom : 1;
+function zoomBy(cam: Cam, canvas: HTMLCanvasElement | null, factor: number) {
+  const rect = canvas?.getBoundingClientRect();
+  const base = cam.user ? cam.zoom : fitZoom(rect?.width ?? 390, rect?.height ?? 520);
   cam.user = true;
-  cam.zoom = Math.max(0.7, Math.min(1.7, base * factor));
+  cam.zoom = Math.max(0.36, Math.min(1.7, base * factor));
 }
 
 function Nav({ icon, label, on, click }: { icon: ReactNode; label: string; on: boolean; click: () => void }) {
   return (
-    <button type="button" onClick={click} className={`flex min-h-14 flex-col items-center justify-center gap-0.5 text-xs ${on ? "text-teal" : "text-mist"}`}>
-      {icon}
+    <button type="button" onClick={click} className={`flex min-h-14 flex-col items-center justify-center gap-0.5 text-[10px] leading-none ${on ? "text-teal" : "text-mist"}`}>
+      <span className="[&_svg]:h-5 [&_svg]:w-5">{icon}</span>
       {label}
     </button>
   );
@@ -500,16 +518,34 @@ function Interior({
       {building.kind === "warehouse" ? (
         <div className="grid gap-2">
           <p className="text-sm">
-            Principio attivo {game.api}/{capacityApi(game)} · {euro(apiPrice(game))} l'unità
+            Principio attivo {game.api}/{capacityApi(game)} · {euro(apiPrice(game))}
           </p>
-          <div className="flex gap-2">
-            <button type="button" className="min-h-11 flex-1 rounded-full bg-teal text-card" onClick={() => apply(orderApi(game, 10))}>
-              Ordina 10
+          <p className="text-sm">
+            Solvente {game.stock.solvent}/{capacityDry(game)} · {euro(matPrice(game, "solvent"))}
+          </p>
+          <p className="text-sm">
+            Eccipiente {game.stock.eccipient}/{capacityDry(game)} · {euro(matPrice(game, "eccipient"))}
+          </p>
+          <p className="text-sm">
+            Flaconi {game.stock.vials}/{capacityVials(game)} · {euro(matPrice(game, "vials"))}
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <button type="button" className="min-h-11 rounded-full bg-teal text-card" onClick={() => apply(orderMat(game, "api", 8))}>
+              API +8
             </button>
-            <button type="button" className="min-h-11 flex-1 rounded-full bg-paper" onClick={() => apply(setAutoBuy(game, !game.autoBuy))}>
-              {game.autoBuy ? "Acquisto auto" : "Acquisto manuale"}
+            <button type="button" className="min-h-11 rounded-full bg-teal text-card" onClick={() => apply(orderMat(game, "solvent", 8))}>
+              Solvente +8
+            </button>
+            <button type="button" className="min-h-11 rounded-full bg-paper" onClick={() => apply(orderMat(game, "eccipient", 8))}>
+              Eccipiente +8
+            </button>
+            <button type="button" className="min-h-11 rounded-full bg-paper" onClick={() => apply(orderMat(game, "vials", 6))}>
+              Flaconi +6
             </button>
           </div>
+          <button type="button" className="min-h-11 rounded-full bg-paper" onClick={() => apply(setAutoBuy(game, !game.autoBuy))}>
+            {game.autoBuy ? "Acquisto automatico acceso" : "Acquisto automatico spento"}
+          </button>
         </div>
       ) : null}
 
@@ -531,10 +567,13 @@ function Interior({
         </button>
       ) : null}
 
-      {building.level < 3 && building.kind !== "hq" ? (
+      {building.kind !== "hq" && building.level < levelCap(game) ? (
         <button type="button" className="min-h-11 rounded-full bg-ink text-card" onClick={() => apply(upgrade(game, id))}>
           Potenzia · {euro(upgradeCost(building))}
         </button>
+      ) : null}
+      {building.kind !== "hq" && building.level >= levelCap(game) ? (
+        <p className="text-sm text-mist">{hasTech(game, "scaleup") ? "Livello massimo." : "La tecnica Scale-up alza il tetto al livello 4."}</p>
       ) : null}
     </div>
   );
@@ -545,11 +584,15 @@ function Deals({ game, apply }: { game: Game; apply: (g: Game | string) => void 
   return (
     <div className="mx-auto grid max-w-lg gap-4">
       <h2 className="font-display text-3xl">Contratti</h2>
+      <p className="text-sm text-mist">
+        API {game.api} · solvente {game.stock.solvent} · eccipiente {game.stock.eccipient} · flaconi {game.stock.vials}
+        {game.autoBuy ? " · riordino automatico" : ""}
+      </p>
       {game.offers.map((offer) => (
         <article key={offer.id} className="rounded-xl border border-line bg-card p-3">
           <p className="font-medium">{offer.title}</p>
           <p className="text-sm text-mist">
-            {offer.batches} lotti · {offer.kind === "biologici" ? "suite sterile" : "impianto"} · qualità {offer.quality}
+            {offer.tier === "pilota" ? "Lotto piccolo, anche sul pilota" : offer.tier === "premium" ? "Serve un impianto di livello 2, o una suite" : "Serve l'impianto pieno"} · {offer.batches} lotti · qualità {offer.quality}
           </p>
           <p className="mt-1 font-display text-xl text-teal">{euro(offer.pay)}</p>
           <button type="button" className="mt-2 min-h-11 w-full rounded-full bg-teal text-card" onClick={() => apply(acceptOffer(game, offer.id))}>
@@ -602,7 +645,7 @@ function Research({
           disabled={!lab || !scientist}
           onClick={() => apply(startProgram(game, indication))}
         >
-          Nuova molecola · 80 mila €
+          Nuova molecola · 70 mila €
         </button>
         {!lab || !scientist ? <p className="mt-2 text-sm text-mist">Serve un laboratorio con uno scienziato dentro.</p> : null}
       </div>
@@ -638,10 +681,51 @@ function Research({
                 Lancia in commercio
               </button>
             ) : null}
+            {program.patented && !["failed", "launched", "licensed", "approved"].includes(program.stage) ? (
+              <button type="button" className="mt-2 min-h-11 w-full rounded-full bg-paper" onClick={() => apply(licenseOut(game, program.id))}>
+                Cedi in licenza
+              </button>
+            ) : null}
           </article>
         );
       })}
       {!game.pipeline.length ? <p className="text-sm text-mist">Ancora nessuna molecola tua. I contratti pagano le luci.</p> : null}
+    </div>
+  );
+}
+
+function TechTree({ game, apply }: { game: Game; apply: (g: Game | string) => void }) {
+  const eras = ["early", "mid", "late", "oltre"] as const;
+  return (
+    <div className="mx-auto grid max-w-lg gap-4">
+      <div>
+        <h2 className="font-display text-3xl">Tecniche</h2>
+        <p className="text-sm text-mist">Scienza {Math.floor(game.science)}. Gli scienziati la producono anche fuori dal laboratorio, più in fretta se sono dentro.</p>
+      </div>
+      {eras.map((era) => (
+        <section key={era} className="grid gap-2">
+          <h3 className="font-display text-2xl">{ERA_LABEL[era]}</h3>
+          {TECH.filter((tech) => tech.era === era).map((tech) => {
+            const owned = hasTech(game, tech.id);
+            const missing = tech.need.filter((id) => !hasTech(game, id));
+            return (
+              <article key={tech.id} className="rounded-xl border border-line bg-card p-3">
+                <p className="font-medium">{tech.name}</p>
+                <p className="text-sm text-mist">{tech.blurb}</p>
+                <p className="mt-1 text-sm">
+                  {owned ? "In casa" : `${euro(tech.cash)} · scienza ${tech.sci}`}
+                  {missing.length ? ` · prima ${missing.map((id) => TECH.find((t) => t.id === id)?.name).join(", ")}` : ""}
+                </p>
+                {owned ? null : (
+                  <button type="button" className="mt-2 min-h-11 w-full rounded-full bg-teal text-card" onClick={() => apply(buyTech(game, tech.id as TechId))}>
+                    Sblocca
+                  </button>
+                )}
+              </article>
+            );
+          })}
+        </section>
+      ))}
     </div>
   );
 }
@@ -667,12 +751,19 @@ function Team({ game, apply }: { game: Game; apply: (g: Game | string) => void }
           </article>
         );
       })}
+      {game.staff.map((person) =>
+        person.skill < 6 ? (
+          <button key={`t-${person.id}`} type="button" className="min-h-11 rounded-xl border border-line px-3 text-left text-sm" onClick={() => apply(train(game, person.id))}>
+            Forma {person.name} · {euro(18_000 + person.skill * 8_000)}
+          </button>
+        ) : null,
+      )}
       <h3 className="font-display text-2xl">Candidati</h3>
       {game.candidates.map((person) => (
         <button key={person.id} type="button" className="min-h-14 rounded-xl border border-line bg-card px-3 text-left" onClick={() => apply(hire(game, person.id))}>
           <span className="block font-medium">Assumi {person.name}</span>
           <span className="text-sm text-mist">
-            {ROLE_LABEL[person.role]} · abilità {person.skill} · {euro(person.salary)}/sett. · ingresso 15 mila €
+            {ROLE_LABEL[person.role]} · abilità {person.skill} · {euro(person.salary)}/sett. · ingresso 12 mila €
           </span>
         </button>
       ))}

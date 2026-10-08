@@ -1,4 +1,4 @@
-import { type Game } from "@/tycoon/model";
+import { normalize, type Game } from "@/tycoon/model";
 
 const KEY = "aurelia-cdmo-v1";
 
@@ -6,9 +6,7 @@ export function loadGame(): Game | null {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return null;
-    const data = JSON.parse(raw) as Game;
-    if (data?.v !== 1 || !data.cells) return null;
-    return data;
+    return normalize(JSON.parse(raw));
   } catch {
     return null;
   }
