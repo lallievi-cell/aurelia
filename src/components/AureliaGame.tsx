@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, FlaskConical, GitBranch, Globe2, Map as MapIcon, Minus, Pause, Play, Plus, ScrollText, Users, X } from "lucide-react";
 import { blip, unlockAudio } from "@/tycoon/audio";
-import { drawCampus, fitZoom, pickTile, cameraBounds, type Cam } from "@/tycoon/draw";
+import { drawCampus, fitZoom, pickSign, pickTile, cameraBounds, type Cam } from "@/tycoon/draw";
 import {
   AUTHORITIES,
-  CHAPTER_BLURB,
   ERA_LABEL,
   GEAR,
   GOAL_TEXT,
@@ -194,7 +193,17 @@ export function AureliaGame() {
     drag.current.active = false;
     if (!game || drag.current.moved) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    const hit = pickTile(e.clientX - rect.left, e.clientY - rect.top, rect.width, rect.height, cam.current, game);
+    const localX = e.clientX - rect.left;
+    const localY = e.clientY - rect.top;
+    const sign = pickSign(localX, localY);
+    if (sign) {
+      const parcel = PARCELS.find((item) => item.id === sign);
+      if (!parcel) return;
+      setRoomId(null);
+      setCell({ c: parcel.c0, r: parcel.r0 });
+      return;
+    }
+    const hit = pickTile(localX, localY, rect.width, rect.height, cam.current, game);
     if (!hit) return;
     const tile = game.tiles[hit.r]![hit.c]!;
     if (tile.ground === "garden") {
@@ -314,10 +323,9 @@ export function AureliaGame() {
         )}
 
         {tab === "map" && !room && !cell && goal ? (
-          <div className="pointer-events-none absolute bottom-3 left-3 max-w-[70%] rounded-xl bg-card/95 px-3 py-2 shadow-sm">
-            <p className="text-sm text-mist">Prossimo passo · {game.chapter}</p>
-            <p className="font-medium">{goal.label}</p>
-            <p className="text-sm text-mist">{CHAPTER_BLURB[game.chapter]}</p>
+          <div className="pointer-events-none absolute bottom-3 left-3 right-16 truncate rounded-full bg-card/95 px-3 py-2 text-sm shadow-sm">
+            <span className="text-mist">Ora · </span>
+            {goal.label}
           </div>
         ) : null}
 
@@ -372,7 +380,7 @@ function zoomBy(cam: Cam, canvas: HTMLCanvasElement | null, game: Game, factor: 
   const rect = canvas?.getBoundingClientRect();
   const base = cam.user ? cam.zoom : fitZoom(rect?.width ?? 390, rect?.height ?? 520, cameraBounds(game));
   cam.user = true;
-  cam.zoom = Math.max(0.36, Math.min(1.8, base * factor));
+  cam.zoom = Math.max(0.32, Math.min(1.7, base * factor));
 }
 
 function Nav({ icon, label, on, click }: { icon: ReactNode; label: string; on: boolean; click: () => void }) {
