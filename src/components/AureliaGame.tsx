@@ -1,69 +1,76 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import {
-  ArrowLeft,
-  FlaskConical,
-  GitBranch,
-  Globe2,
-  Map as MapIcon,
-  Minus,
-  Pause,
-  Play,
-  Plus,
-  ScrollText,
-  Users,
-  X,
-} from "lucide-react";
+import { ArrowLeft, FlaskConical, GitBranch, Globe2, Map as MapIcon, Minus, Pause, Play, Plus, ScrollText, Users, X } from "lucide-react";
 import { blip, unlockAudio } from "@/tycoon/audio";
-import { drawCampus, drawInterior, fitZoom, pickStation, pickTile, type Cam } from "@/tycoon/draw";
+import { drawCampus, fitZoom, pickTile, cameraBounds, type Cam } from "@/tycoon/draw";
 import {
   AUTHORITIES,
-  CATALOG,
   CHAPTER_BLURB,
   ERA_LABEL,
+  GEAR,
   GOAL_TEXT,
   INDICATIONS,
+  MAT_LABEL,
   NEXT_STAGE,
+  PARCELS,
   ROLE_LABEL,
+  ROOMS,
   STAGE_LABEL,
   TECH,
   acceptOffer,
   advanceProgram,
-  allBuildings,
-  apiPrice,
+  anchorsOf,
   assign,
   audit,
-  buildCost,
-  buildingById,
+  buyParcel,
   buyTech,
-  canBuild,
-  capacityApi,
-  capacityDry,
-  capacityVials,
-  catalog,
+  canCorridor,
+  canExpand,
+  canInstall,
+  canPlace,
+  capOf,
+  coverage,
   demandOf,
   dismiss,
   euro,
+  expandRoom,
+  gearDef,
+  gearOn,
+  hasGear,
   hasTech,
   hire,
+  installGear,
   launchProduct,
-  levelCap,
   licenseOut,
   matPrice,
   newGame,
   orderMat,
-  place,
+  parcelAt,
+  placeCorridor,
+  placeRoom,
+  powerReport,
+  removeCorridor,
+  removeGear,
+  removeRoom,
+  roomDef,
+  roomOnline,
   setAutoBuy,
   setPrice,
+  slotsFor,
   staffIn,
   startProgram,
+  techDef,
   tick,
   train,
-  upgrade,
-  upgradeCost,
+  upgradeGear,
+  upgradeRoom,
+  upgradeRoomCost,
   waitingProgram,
   yearOf,
   type Focus,
   type Game,
+  type MatKey,
+  type ParcelId,
+  type RoomType,
   type TechId,
 } from "@/tycoon/model";
 import { clearGame, loadGame, saveGame } from "@/tycoon/save";
@@ -83,25 +90,20 @@ export function AureliaGame() {
   const [company, setCompany] = useState("Aurelia");
   const [focus, setFocus] = useState<Focus>("sintesi");
   const [cell, setCell] = useState<{ c: number; r: number } | null>(null);
-  const [inside, setInside] = useState<string | null>(null);
+  const [roomId, setRoomId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
   const [indication, setIndication] = useState(INDICATIONS[0]!);
-  const [stationHint, setStationHint] = useState<string | null>(null);
   const [armReset, setArmReset] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const cam = useRef<Cam>({ panX: 0, panY: 0, zoom: 1, user: false });
   const gameRef = useRef<Game | null>(null);
-  const insideRef = useRef<string | null>(null);
   const cellRef = useRef<{ c: number; r: number } | null>(null);
   const playRef = useRef(false);
-  const stationRef = useRef<string | null>(null);
   const drag = useRef({ x: 0, y: 0, panX: 0, panY: 0, moved: false, active: false });
   gameRef.current = game;
-  insideRef.current = inside;
   cellRef.current = cell;
   playRef.current = playing;
-  stationRef.current = stationHint;
 
   useEffect(() => {
     const saved = loadGame();
@@ -111,7 +113,7 @@ export function AureliaGame() {
 
   useEffect(() => {
     if (!toast) return;
-    const id = window.setTimeout(() => setToast(null), 2400);
+    const id = window.setTimeout(() => setToast(null), 2600);
     return () => window.clearTimeout(id);
   }, [toast]);
 
@@ -137,13 +139,11 @@ export function AureliaGame() {
       const current = gameRef.current;
       if (ctx && current && rect.width > 0) {
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        const building = buildingById(current, insideRef.current);
-        if (building) drawInterior(ctx, current, building, rect.width, rect.height, now / 1000, stationRef.current);
-        else drawCampus(ctx, current, rect.width, rect.height, cam.current, now / 1000, cellRef.current);
+        drawCampus(ctx, current, rect.width, rect.height, cam.current, now / 1000, cellRef.current);
       }
       if (playRef.current && current && !waitingProgram(current)) {
         acc += dt;
-        if (acc >= 0.95) {
+        if (acc >= 1.05) {
           acc = 0;
           const stepped = tick(current);
           gameRef.current = stepped;
@@ -160,8 +160,8 @@ export function AureliaGame() {
 
   function found() {
     unlockAudio();
-    const next = newGame(company, focus);
-    commit(next, setGame);
+    cam.current = { panX: 0, panY: 0, zoom: 1, user: false };
+    commit(newGame(company, focus), setGame);
   }
 
   function apply(next: Game | string) {
@@ -173,65 +173,48 @@ export function AureliaGame() {
     commit(next, setGame);
   }
 
-  function stepOnce() {
-    if (!game) return;
-    unlockAudio();
-    apply(tick(game));
-  }
-
   function onPointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
     drag.current = { x: e.clientX, y: e.clientY, panX: cam.current.panX, panY: cam.current.panY, moved: false, active: true };
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
     } catch {
-      /* il puntatore può già essere stato rilasciato */
+      /* già rilasciato */
     }
   }
-
   function onPointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
     if (!drag.current.active) return;
     const dx = e.clientX - drag.current.x;
     const dy = e.clientY - drag.current.y;
     if (Math.hypot(dx, dy) > 8) drag.current.moved = true;
-    if (!drag.current.moved || inside) return;
+    if (!drag.current.moved) return;
     cam.current.panX = drag.current.panX + dx;
     cam.current.panY = drag.current.panY + dy;
   }
-
   function onPointerUp(e: React.PointerEvent<HTMLCanvasElement>) {
     drag.current.active = false;
     if (!game || drag.current.moved) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const building = buildingById(game, inside);
-    if (building) {
-      setStationHint(pickStation(x, y, rect.width, rect.height, building.kind, building.level));
-      return;
-    }
-    const hit = pickTile(x, y, rect.width, rect.height, cam.current);
+    const hit = pickTile(e.clientX - rect.left, e.clientY - rect.top, rect.width, rect.height, cam.current, game);
     if (!hit) return;
-    const plot = game.cells[hit.r]![hit.c]!;
-    if (plot.blocked) {
-      setToast(plot.ground === "water" ? "Qui c'è il bacino." : plot.ground === "road" ? "La strada resta libera." : "Il cortile resta verde.");
+    const tile = game.tiles[hit.r]![hit.c]!;
+    if (tile.ground === "garden") {
+      setToast("Il cortile resta verde.");
       return;
     }
-    if (plot.building) {
-      setInside(plot.building.id);
+    if (tile.roomId) {
+      setRoomId(tile.roomId);
       setCell(null);
-      setStationHint(null);
       return;
     }
+    setRoomId(null);
     setCell(hit);
-    setInside(null);
   }
 
   const goal = game ? GOAL_TEXT.find((item) => !game.goals.includes(item.id)) : null;
   const waiting = game ? waitingProgram(game) : null;
+  const power = game ? powerReport(game) : null;
 
-  if (!booted) {
-    return <div className="grid h-dvh place-items-center bg-paper font-display text-3xl text-ink">Aurelia</div>;
-  }
+  if (!booted) return <div className="grid h-dvh place-items-center bg-paper font-display text-3xl text-ink">Aurelia</div>;
 
   if (!game) {
     return (
@@ -241,31 +224,26 @@ export function AureliaGame() {
             <p className="text-sm font-semibold uppercase tracking-widest text-teal">CDMO</p>
             <h1 className="font-display text-5xl leading-none">Aurelia</h1>
             <p className="mt-3 text-base leading-relaxed text-mist">
-              Parti come CDMO: lotti piccoli, magazzino, persone. Poi laboratorio, brevetti, clinica e un farmaco tuo. La partita dura anni di gioco.
+              Parti da un lotto piccolo. Allunga i corridoi, posa le stanze e compra le macchine. Senza tecnica e senza corrente, la stanza resta vuota.
             </p>
           </div>
           <label className="block">
             <span className="text-sm text-mist">Nome</span>
-            <input
-              value={company}
-              maxLength={22}
-              onChange={(e) => setCompany(e.target.value)}
-              className="mt-1 min-h-12 w-full rounded-xl border border-line bg-card px-3 font-display text-2xl outline-none"
-            />
+            <input value={company} maxLength={22} onChange={(e) => setCompany(e.target.value)} className="mt-1 min-h-12 w-full rounded-xl border border-line bg-card px-3 font-display text-2xl outline-none" />
           </label>
           <div className="grid grid-cols-2 gap-3">
-            <FocusCard title="Sintesi" text="Impianto più economico. Contratti più frequenti." on={focus === "sintesi"} click={() => setFocus("sintesi")} />
-            <FocusCard title="Biologici" text="Suite sterile scontata. Lotti pagati meglio." on={focus === "biologici"} click={() => setFocus("biologici")} />
+            <FocusCard title="Sintesi" text="Il pilota è la prima linea. L'impianto arriva dopo." on={focus === "sintesi"} click={() => setFocus("sintesi")} />
+            <FocusCard title="Biologici" text="Parti con il GMP già in tasca. La suite è comunque tardi." on={focus === "biologici"} click={() => setFocus("biologici")} />
           </div>
           <button type="button" onClick={found} className="min-h-12 rounded-full bg-teal font-semibold text-card">
-            Apri il campus
+            Apri il lotto
           </button>
         </div>
       </div>
     );
   }
 
-  const interior = buildingById(game, inside);
+  const room = game.rooms.find((item) => item.id === roomId) ?? null;
 
   return (
     <div className="flex h-dvh flex-col bg-paper text-ink">
@@ -280,7 +258,7 @@ export function AureliaGame() {
           <p className="font-display text-lg leading-none">{euro(game.cash)}</p>
           <p className="text-sm text-mist">sett. {game.week}</p>
         </div>
-        <button type="button" aria-label="Avanza di una settimana" onClick={stepOnce} className="grid h-11 w-11 place-items-center rounded-full bg-amber text-ink">
+        <button type="button" aria-label="Avanza di una settimana" onClick={() => apply(tick(game))} className="grid h-11 w-11 place-items-center rounded-full bg-amber text-ink">
           <Plus />
         </button>
         <button
@@ -295,29 +273,22 @@ export function AureliaGame() {
           {playing ? <Pause /> : <Play />}
         </button>
       </header>
-      <div className="grid grid-cols-5 gap-1 border-b border-line bg-card px-2 py-1 text-center text-[11px] text-mist">
-        <span>Rep. {Math.round(game.reputation)}</span>
-        <span>Qual. {Math.round(game.quality)}</span>
-        <span>Quota {Math.round(game.playerShare)}%</span>
-        <span>API {game.api}</span>
-        <span>Sci. {Math.floor(game.science)}</span>
+      <div className="grid grid-cols-4 gap-1 border-b border-line bg-card px-2 py-1 text-center text-[11px] text-mist">
+        <span>API {game.api}/{capOf(game, "api")}</span>
+        <span>Sol {game.solvent}</span>
+        <span>Sci {Math.floor(game.science)}</span>
+        <span>
+          kW {power?.demand}/{power?.supply}
+        </span>
       </div>
 
       <main className="relative min-h-0 flex-1">
         {tab === "map" ? (
-          <canvas
-            ref={canvasRef}
-            className="absolute inset-0 h-full w-full touch-none"
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-          />
+          <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} />
         ) : (
           <div className="absolute inset-0 overflow-y-auto px-4 py-4 pb-28">
             {tab === "deals" ? <Deals game={game} apply={apply} /> : null}
-            {tab === "research" ? (
-              <Research game={game} apply={apply} indication={indication} setIndication={setIndication} />
-            ) : null}
+            {tab === "research" ? <Research game={game} apply={apply} indication={indication} setIndication={setIndication} /> : null}
             {tab === "tech" ? <TechTree game={game} apply={apply} /> : null}
             {tab === "team" ? <Team game={game} apply={apply} /> : null}
             {tab === "world" ? (
@@ -333,7 +304,8 @@ export function AureliaGame() {
                   clearGame();
                   setGame(null);
                   setPlaying(false);
-                  setInside(null);
+                  setRoomId(null);
+                  setCell(null);
                   setArmReset(false);
                 }}
               />
@@ -341,74 +313,45 @@ export function AureliaGame() {
           </div>
         )}
 
-        {tab === "map" && !interior && !cell && goal ? (
-          <div className="pointer-events-none absolute left-3 right-3 top-3 rounded-xl bg-card/95 px-3 py-2 shadow-sm">
+        {tab === "map" && !room && !cell && goal ? (
+          <div className="pointer-events-none absolute left-3 right-16 top-3 rounded-xl bg-card/95 px-3 py-2 shadow-sm">
             <p className="text-sm text-mist">Prossimo passo · {game.chapter}</p>
             <p className="font-medium">{goal.label}</p>
             <p className="text-sm text-mist">{CHAPTER_BLURB[game.chapter]}</p>
           </div>
         ) : null}
 
-        {tab === "map" && !interior ? (
-          <div className="absolute bottom-3 right-3 flex flex-col gap-2">
-            <button type="button" aria-label="Avvicina" className="grid h-11 w-11 place-items-center rounded-full bg-card shadow-sm" onClick={() => zoomBy(cam.current, canvasRef.current, 1.12)}>
+        {tab === "map" ? (
+          <div className="absolute right-3 bottom-3 flex flex-col gap-2">
+            <button type="button" aria-label="Avvicina" className="grid h-11 w-11 place-items-center rounded-full bg-card shadow-sm" onClick={() => zoomBy(cam.current, canvasRef.current, game, 1.12)}>
               <Plus />
             </button>
-            <button type="button" aria-label="Allontana" className="grid h-11 w-11 place-items-center rounded-full bg-card shadow-sm" onClick={() => zoomBy(cam.current, canvasRef.current, 0.88)}>
+            <button type="button" aria-label="Allontana" className="grid h-11 w-11 place-items-center rounded-full bg-card shadow-sm" onClick={() => zoomBy(cam.current, canvasRef.current, game, 0.88)}>
               <Minus />
             </button>
           </div>
         ) : null}
 
-        {toast ? <p className="absolute left-3 right-3 top-3 rounded-xl bg-ink px-3 py-2 text-sm text-card">{toast}</p> : null}
-        {waiting && playing ? (
-          <p className="absolute left-3 right-16 top-16 rounded-xl bg-amber px-3 py-2 text-sm text-ink">
-            {waiting.code} aspetta una decisione. Pausa.
-          </p>
-        ) : null}
+        {toast ? <p className="absolute top-3 right-3 left-3 z-40 rounded-xl bg-ink px-3 py-2 text-sm text-card">{toast}</p> : null}
+        {waiting && playing ? <p className="absolute top-16 right-16 left-3 rounded-xl bg-amber px-3 py-2 text-sm text-ink">{waiting.code} aspetta una decisione. Pausa.</p> : null}
 
-        {tab === "map" && cell && !interior ? (
-          <Sheet onClose={() => setCell(null)} title="Costruisci">
-            <div className="grid gap-2">
-              {CATALOG.filter((item) => item.kind !== "hq").map((item) => {
-                const cost = buildCost(game, item.kind);
-                const block = canBuild(game, item.kind, cell.c, cell.r);
-                return (
-                  <button
-                    key={item.kind}
-                    type="button"
-                    onClick={() => {
-                      const result = place(game, item.kind, cell.c, cell.r);
-                      if (typeof result === "string") setToast(result);
-                      else {
-                        apply(result);
-                        setCell(null);
-                      }
-                    }}
-                    className="flex min-h-14 items-center justify-between gap-3 rounded-xl border border-line bg-paper px-3 text-left"
-                  >
-                    <span>
-                      <span className="block font-medium">{item.name}</span>
-                      <span className="block text-sm text-mist">{block && block !== "Cassa insufficiente." ? block : item.blurb}</span>
-                    </span>
-                    <span className="shrink-0 font-display text-amber">{euro(cost)}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </Sheet>
-        ) : null}
-
-        {tab === "map" && interior ? (
-          <Sheet
-            onClose={() => {
-              setInside(null);
-              setStationHint(null);
+        {tab === "map" && cell ? (
+          <BuildSheet
+            game={game}
+            c={cell.c}
+            r={cell.r}
+            apply={apply}
+            close={() => setCell(null)}
+            bought={() => {
+              cam.current.user = false;
+              cam.current.panX = 0;
+              cam.current.panY = 0;
             }}
-            title={catalog(interior.kind).name}
-            back
-          >
-            <Interior game={game} id={interior.id} station={stationHint} apply={apply} openResearch={() => { setTab("research"); setInside(null); }} />
+          />
+        ) : null}
+        {tab === "map" && room ? (
+          <Sheet title={roomDef(room.type).name} onClose={() => setRoomId(null)} back>
+            <RoomPanel game={game} id={room.id} apply={apply} close={() => setRoomId(null)} />
           </Sheet>
         ) : null}
       </main>
@@ -425,11 +368,11 @@ export function AureliaGame() {
   );
 }
 
-function zoomBy(cam: Cam, canvas: HTMLCanvasElement | null, factor: number) {
+function zoomBy(cam: Cam, canvas: HTMLCanvasElement | null, game: Game, factor: number) {
   const rect = canvas?.getBoundingClientRect();
-  const base = cam.user ? cam.zoom : fitZoom(rect?.width ?? 390, rect?.height ?? 520);
+  const base = cam.user ? cam.zoom : fitZoom(rect?.width ?? 390, rect?.height ?? 520, cameraBounds(game));
   cam.user = true;
-  cam.zoom = Math.max(0.36, Math.min(1.7, base * factor));
+  cam.zoom = Math.max(0.36, Math.min(1.8, base * factor));
 }
 
 function Nav({ icon, label, on, click }: { icon: ReactNode; label: string; on: boolean; click: () => void }) {
@@ -440,7 +383,6 @@ function Nav({ icon, label, on, click }: { icon: ReactNode; label: string; on: b
     </button>
   );
 }
-
 function FocusCard({ title, text, on, click }: { title: string; text: string; on: boolean; click: () => void }) {
   return (
     <button type="button" onClick={click} className={`min-h-24 rounded-xl border px-3 py-3 text-left ${on ? "border-teal bg-card" : "border-line bg-paper"}`}>
@@ -449,13 +391,12 @@ function FocusCard({ title, text, on, click }: { title: string; text: string; on
     </button>
   );
 }
-
 function Sheet({ title, onClose, children, back }: { title: string; onClose: () => void; children: ReactNode; back?: boolean }) {
   return (
-    <section className="absolute inset-x-0 bottom-0 z-30 max-h-[68%] overflow-y-auto rounded-t-3xl border border-line bg-card px-4 pt-3 pb-4 shadow-md">
+    <section className="absolute inset-x-0 bottom-0 z-30 max-h-[72%] overflow-y-auto rounded-t-3xl border border-line bg-card px-4 pt-3 pb-4 shadow-md">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="font-display text-2xl">{title}</h2>
-        <button type="button" aria-label={back ? "Torna al campus" : "Chiudi"} onClick={onClose} className="grid h-11 w-11 place-items-center rounded-full bg-paper">
+        <button type="button" aria-label={back ? "Chiudi scheda" : "Chiudi"} onClick={onClose} className="grid h-11 w-11 place-items-center rounded-full bg-paper">
           {back ? <ArrowLeft /> : <X />}
         </button>
       </div>
@@ -464,42 +405,101 @@ function Sheet({ title, onClose, children, back }: { title: string; onClose: () 
   );
 }
 
-function Interior({
-  game,
-  id,
-  station,
-  apply,
-  openResearch,
-}: {
-  game: Game;
-  id: string;
-  station: string | null;
-  apply: (g: Game | string) => void;
-  openResearch: () => void;
-}) {
-  const building = buildingById(game, id);
-  if (!building) return null;
-  const item = catalog(building.kind);
+function BuildSheet({ game, c, r, apply, close, bought }: { game: Game; c: number; r: number; apply: (g: Game | string) => void; close: () => void; bought: () => void }) {
+  const parcel = parcelAt(c, r);
+  const tile = game.tiles[r]![c]!;
+  if (!parcel) return null;
+  if (!game.owned.includes(parcel.id)) {
+    return (
+      <Sheet title={parcel.name} onClose={close}>
+        <p className="text-sm text-mist">{parcel.tech ? `Tecnica: ${techDef(parcel.tech).name}. ` : ""}{parcel.needBatch ? "Serve un lotto già consegnato. " : ""}Costa {euro(parcel.cost)}.</p>
+        <button
+          type="button"
+          className="mt-3 min-h-11 w-full rounded-full bg-teal text-card"
+          onClick={() => {
+            const result = buyParcel(game, parcel.id as ParcelId);
+            if (typeof result !== "string") bought();
+            apply(result);
+            if (typeof result !== "string") close();
+          }}
+        >
+          Compra il lotto
+        </button>
+      </Sheet>
+    );
+  }
+  const options = ROOMS.filter((def) => def.type !== "hq" && def.parcels.includes(parcel.id));
+  return (
+    <Sheet title={tile.corridor ? "Corridoio" : "Costruisci"} onClose={close}>
+      <p className="mb-2 text-sm text-mist">
+        Lotto {parcel.name}. Per una stanza tocca l'angolo nord-ovest: la stanza cresce verso est e verso sud.
+      </p>
+      {tile.corridor ? (
+        <button type="button" className="mb-2 min-h-11 w-full rounded-full bg-paper" onClick={() => { apply(removeCorridor(game, c, r)); close(); }}>
+          Togli corridoio · rimborso 4 mila €
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="mb-2 min-h-11 w-full rounded-full bg-ink text-card"
+          onClick={() => {
+            const result = placeCorridor(game, c, r);
+            apply(result);
+            if (typeof result !== "string") close();
+          }}
+        >
+          Corridoio · 8 mila €{canCorridor(game, c, r) ? ` · ${canCorridor(game, c, r)}` : ""}
+        </button>
+      )}
+      <div className="grid gap-2">
+        {options.map((def) => {
+          const block = canPlace(game, def.type as RoomType, c, r);
+          return (
+            <button
+              key={def.type}
+              type="button"
+              className="min-h-14 rounded-xl border border-line bg-paper px-3 text-left"
+              onClick={() => {
+                const result = placeRoom(game, def.type, c, r);
+                apply(result);
+                if (typeof result !== "string") close();
+              }}
+            >
+              <span className="block font-medium">
+                {def.name} · {def.w}×{def.h}
+              </span>
+              <span className="block text-sm text-mist">{block ?? def.blurb}</span>
+              <span className="font-display text-amber">{euro(def.shell)}</span>
+            </button>
+          );
+        })}
+      </div>
+    </Sheet>
+  );
+}
+
+function RoomPanel({ game, id, apply, close }: { game: Game; id: string; apply: (g: Game | string) => void; close: () => void }) {
+  const room = game.rooms.find((item) => item.id === id);
+  const [pick, setPick] = useState<number | null>(null);
+  useEffect(() => setPick(null), [id]);
+  if (!room) return null;
+  const def = roomDef(room.type);
   const crew = staffIn(game, id);
-  const free = game.staff.filter((s) => !s.buildingId && (!item.role || s.role === item.role));
-  const jobs = game.jobs.filter((j) => j.lineId === id && j.status === "active");
+  const free = game.staff.filter((s) => !s.roomId && def.role && s.role === def.role);
+  const online = roomOnline(game, room);
   return (
     <div className="grid gap-3">
-      <p className="text-sm leading-relaxed text-mist">
-        Livello {building.level}
-        {building.halt > 0 ? ` · ferma ${building.halt} sett.` : ""}
-        {station ? ` · ${station}` : ""}
+      <p className="text-sm text-mist">
+        {def.w}×{def.h} · livello {room.level} · {online ? "collegata" : "non collegata alla direzione"}
+        {room.halt > 0 ? ` · ferma ${room.halt} sett.` : ""} · posti {slotsFor(room)}
       </p>
-      {item.role ? (
+      {def.role ? (
         <div className="grid gap-2">
-          <p className="text-sm font-medium">{item.roleLabel}</p>
           {crew.map((s) => (
-            <div key={s.id} className="flex items-center justify-between gap-2 rounded-xl bg-paper px-3 py-2">
+            <div key={s.id} className="flex items-center justify-between rounded-xl bg-paper px-3 py-2">
               <span>
                 {s.name}
-                <span className="block text-sm text-mist">
-                  {ROLE_LABEL[s.role]} · abilità {s.skill}
-                </span>
+                <span className="block text-sm text-mist">abilità {s.skill}</span>
               </span>
               <button type="button" className="min-h-11 rounded-full px-3 text-sm text-teal" onClick={() => apply(assign(game, s.id, null))}>
                 Togli
@@ -511,88 +511,120 @@ function Interior({
               Assegna {s.name}
             </button>
           ))}
-          {!free.length && !crew.length ? <p className="text-sm text-mist">Nessuna persona libera con questo mestiere.</p> : null}
         </div>
       ) : null}
-
-      {building.kind === "warehouse" ? (
-        <div className="grid gap-2">
-          <p className="text-sm">
-            Principio attivo {game.api}/{capacityApi(game)} · {euro(apiPrice(game))}
-          </p>
-          <p className="text-sm">
-            Solvente {game.stock.solvent}/{capacityDry(game)} · {euro(matPrice(game, "solvent"))}
-          </p>
-          <p className="text-sm">
-            Eccipiente {game.stock.eccipient}/{capacityDry(game)} · {euro(matPrice(game, "eccipient"))}
-          </p>
-          <p className="text-sm">
-            Flaconi {game.stock.vials}/{capacityVials(game)} · {euro(matPrice(game, "vials"))}
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            <button type="button" className="min-h-11 rounded-full bg-teal text-card" onClick={() => apply(orderMat(game, "api", 8))}>
-              API +8
-            </button>
-            <button type="button" className="min-h-11 rounded-full bg-teal text-card" onClick={() => apply(orderMat(game, "solvent", 8))}>
-              Solvente +8
-            </button>
-            <button type="button" className="min-h-11 rounded-full bg-paper" onClick={() => apply(orderMat(game, "eccipient", 8))}>
-              Eccipiente +8
-            </button>
-            <button type="button" className="min-h-11 rounded-full bg-paper" onClick={() => apply(orderMat(game, "vials", 6))}>
-              Flaconi +6
-            </button>
+      {room.slots.map((slot, index) => {
+        const item = slot.item;
+        if (!item) {
+          const open = pick === index;
+          return (
+            <div key={index} className="rounded-xl border border-dashed border-line p-2">
+              <button type="button" className="min-h-11 w-full text-left text-sm" onClick={() => setPick(open ? null : index)}>
+                Posto {index + 1} · {open ? "scegli qui sotto" : "tocca per arredare"}
+              </button>
+              {open ? <GearChoices game={game} roomType={room.type} roomId={id} index={index} apply={apply} /> : null}
+            </div>
+          );
+        }
+        const spec = gearDef(item.defId);
+        const on = gearOn(game, id, index);
+        return (
+          <div key={index} className="rounded-xl bg-paper px-3 py-2">
+            <p className="font-medium">
+              {item.defId === "reattore" && item.level === 2 ? "Reattore 50 L" : item.defId === "reattore" && item.level === 3 ? "Reattore 200 L" : spec.name}
+              {item.mat ? ` · ${MAT_LABEL[item.mat]}` : ""}
+            </p>
+            <p className="text-sm text-mist">
+              Livello {item.level}/{spec.maxLevel} · {on ? "alimentata" : "senza corrente"}
+            </p>
+            <div className="mt-2 flex gap-2">
+              {item.level < spec.maxLevel ? (
+                <button type="button" className="min-h-11 flex-1 rounded-full bg-ink text-sm text-card" onClick={() => apply(upgradeGear(game, id, index))}>
+                  Potenzia · {euro(spec.cost * item.level)}
+                </button>
+              ) : null}
+              {item.defId !== "scrivania" ? (
+                <button type="button" className="min-h-11 rounded-full px-3 text-sm text-mist" onClick={() => apply(removeGear(game, id, index))}>
+                  Vendi
+                </button>
+              ) : null}
+            </div>
           </div>
-          <button type="button" className="min-h-11 rounded-full bg-paper" onClick={() => apply(setAutoBuy(game, !game.autoBuy))}>
-            {game.autoBuy ? "Acquisto automatico acceso" : "Acquisto automatico spento"}
-          </button>
-        </div>
+        );
+      })}
+      {room.level < 3 ? (
+        <button type="button" className="min-h-11 rounded-full bg-ink text-card" onClick={() => apply(upgradeRoom(game, id))}>
+          Livello stanza {room.level + 1} · {euro(upgradeRoomCost(room))}
+        </button>
       ) : null}
-
-      {building.kind === "plant" || building.kind === "sterile" ? (
-        <div className="grid gap-1 text-sm">
-          {jobs.length ? jobs.map((j) => <p key={j.id}>{j.client}: lotto {j.done}/{j.batches}</p>) : <p className="text-mist">Nessun lotto su questa linea.</p>}
-        </div>
+      {def.expand && !room.expanded ? (
+        <button type="button" className="min-h-11 rounded-full bg-paper" onClick={() => apply(expandRoom(game, id))}>
+          Allarga · {euro(Math.round(def.shell * 0.7))}
+          {canExpand(game, id) ? ` · ${canExpand(game, id)}` : ""}
+        </button>
       ) : null}
-
-      {building.kind === "qc" ? (
+      {room.type === "qc" && hasGear(game, "bilancia") ? (
         <button type="button" className="min-h-11 rounded-full bg-teal text-card" onClick={() => apply(audit(game))}>
-          Audit interno · 60 mila €
+          Audit · 40 mila €
         </button>
       ) : null}
+      {room.type !== "hq" ? (
+        <button type="button" className="min-h-11 rounded-full border border-line text-mist" onClick={() => { const result = removeRoom(game, id); apply(result); if (typeof result !== "string") close(); }}>
+          Smonta il guscio vuoto
+        </button>
+      ) : null}
+      <p className="text-sm text-mist">Ancoraggi usati {room.slots.filter((s) => s.item).length}/{anchorsOf(room)}. Copertura qualità {Math.round(coverage(game))}.</p>
+    </div>
+  );
+}
 
-      {building.kind === "lab" || building.kind === "clinical" || building.kind === "regulatory" ? (
-        <button type="button" className="min-h-11 rounded-full bg-paper" onClick={openResearch}>
-          Apri ricerca e dossier
-        </button>
-      ) : null}
-
-      {building.kind !== "hq" && building.level < levelCap(game) ? (
-        <button type="button" className="min-h-11 rounded-full bg-ink text-card" onClick={() => apply(upgrade(game, id))}>
-          Potenzia · {euro(upgradeCost(building))}
-        </button>
-      ) : null}
-      {building.kind !== "hq" && building.level >= levelCap(game) ? (
-        <p className="text-sm text-mist">{hasTech(game, "scaleup") ? "Livello massimo." : "La tecnica Scale-up alza il tetto al livello 4."}</p>
-      ) : null}
+function GearChoices({ game, roomType, roomId, index, apply }: { game: Game; roomType: RoomType; roomId: string; index: number; apply: (g: Game | string) => void }) {
+  const gear = GEAR.filter((item) => item.room === roomType && item.id !== "scrivania");
+  return (
+    <div className="mt-2 grid gap-2">
+      {gear.map((item) =>
+        item.mats ? (
+          <div key={item.id} className="grid grid-cols-3 gap-1">
+            {(["api", "solvent", "eccipient"] as MatKey[]).map((mat) => (
+              <button key={mat} type="button" className="min-h-11 rounded-lg bg-paper text-xs" onClick={() => apply(installGear(game, roomId, index, item.id, mat))}>
+                Scaffale {MAT_LABEL[mat]}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <button key={item.id} type="button" className="min-h-11 rounded-lg bg-paper px-2 text-left text-sm" onClick={() => apply(installGear(game, roomId, index, item.id))}>
+            {item.name} · {euro(item.cost)}
+            {canInstall(game, roomId, index, item.id) ? <span className="block text-mist">{canInstall(game, roomId, index, item.id)}</span> : null}
+            <span className="block text-mist">{item.kw ? `${item.id === "reattore" ? "3–5" : item.kw} kW` : item.supply ? `+${item.supply} kW a livello` : "non consuma"}</span>
+          </button>
+        ),
+      )}
     </div>
   );
 }
 
 function Deals({ game, apply }: { game: Game; apply: (g: Game | string) => void }) {
-  const active = game.jobs.filter((j) => j.status === "queued" || j.status === "active");
+  const active = game.jobs;
   return (
     <div className="mx-auto grid max-w-lg gap-4">
       <h2 className="font-display text-3xl">Contratti</h2>
       <p className="text-sm text-mist">
-        API {game.api} · solvente {game.stock.solvent} · eccipiente {game.stock.eccipient} · flaconi {game.stock.vials}
-        {game.autoBuy ? " · riordino automatico" : ""}
+        API {game.api}/{capOf(game, "api")} · solvente {game.solvent}/{capOf(game, "solvent")} · eccipiente {game.eccipient}/{capOf(game, "eccipient")} · flaconi {game.vials}/{capOf(game, "vials")}
       </p>
+      <button type="button" className="min-h-11 rounded-full bg-paper" onClick={() => apply(setAutoBuy(game, !game.autoBuy))}>
+        {game.autoBuy ? "Riordino automatico acceso" : "Riordino spento"}
+      </button>
+      <div className="grid grid-cols-2 gap-2">
+        <button type="button" className="min-h-11 rounded-full bg-teal text-card" onClick={() => apply(orderMat(game, "api", 8))}>API +8</button>
+        <button type="button" className="min-h-11 rounded-full bg-teal text-card" onClick={() => apply(orderMat(game, "solvent", 8))}>Solvente +8</button>
+        <button type="button" className="min-h-11 rounded-full bg-paper" onClick={() => apply(orderMat(game, "eccipient", 8))}>Eccipiente +8</button>
+        <button type="button" className="min-h-11 rounded-full bg-paper" onClick={() => apply(orderMat(game, "vials", 6))}>Flaconi +6</button>
+      </div>
       {game.offers.map((offer) => (
         <article key={offer.id} className="rounded-xl border border-line bg-card p-3">
           <p className="font-medium">{offer.title}</p>
           <p className="text-sm text-mist">
-            {offer.tier === "pilota" ? "Lotto piccolo, anche sul pilota" : offer.tier === "premium" ? "Serve un impianto di livello 2, o una suite" : "Serve l'impianto pieno"} · {offer.batches} lotti · qualità {offer.quality}
+            {offer.tier} · {offer.batches} lotti · qualità chiesta {offer.quality} · API {offer.api} solvente {offer.solvent} flaconi {offer.vials}
           </p>
           <p className="mt-1 font-display text-xl text-teal">{euro(offer.pay)}</p>
           <button type="button" className="mt-2 min-h-11 w-full rounded-full bg-teal text-card" onClick={() => apply(acceptOffer(game, offer.id))}>
@@ -601,32 +633,16 @@ function Deals({ game, apply }: { game: Game; apply: (g: Game | string) => void 
         </article>
       ))}
       <h3 className="font-display text-2xl">In corso</h3>
-      {active.length ? (
-        active.map((job) => (
-          <p key={job.id} className="rounded-xl bg-card px-3 py-2 text-sm">
-            {job.client} · {job.status === "queued" ? "in attesa di una linea e di un operatore" : `lotto ${job.done}/${job.batches}`}
-          </p>
-        ))
-      ) : (
-        <p className="text-sm text-mist">Nessun contratto aperto.</p>
-      )}
+      {active.length ? active.map((job) => (
+        <p key={job.id} className="rounded-xl bg-card px-3 py-2 text-sm">
+          {job.client} · {job.status === "queued" ? "in cerca di una linea collegata, accesa e con operatore" : `lotto ${job.done}/${job.batches}`}
+        </p>
+      )) : <p className="text-sm text-mist">Nessun contratto aperto.</p>}
     </div>
   );
 }
 
-function Research({
-  game,
-  apply,
-  indication,
-  setIndication,
-}: {
-  game: Game;
-  apply: (g: Game | string) => void;
-  indication: string;
-  setIndication: (v: string) => void;
-}) {
-  const lab = allBuildings(game).some((b) => b.kind === "lab");
-  const scientist = game.staff.some((s) => s.role === "scientist" && buildingById(game, s.buildingId)?.kind === "lab");
+function Research({ game, apply, indication, setIndication }: { game: Game; apply: (g: Game | string) => void; indication: string; setIndication: (v: string) => void }) {
   return (
     <div className="mx-auto grid max-w-lg gap-4">
       <h2 className="font-display text-3xl">Ricerca</h2>
@@ -634,62 +650,43 @@ function Research({
         <label className="text-sm text-mist">
           Indicazione
           <select value={indication} onChange={(e) => setIndication(e.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-line bg-paper px-2">
-            {INDICATIONS.map((item) => (
-              <option key={item}>{item}</option>
-            ))}
+            {INDICATIONS.map((item) => <option key={item}>{item}</option>)}
           </select>
         </label>
-        <button
-          type="button"
-          className="mt-3 min-h-11 w-full rounded-full bg-teal text-card disabled:opacity-40"
-          disabled={!lab || !scientist}
-          onClick={() => apply(startProgram(game, indication))}
-        >
+        <button type="button" className="mt-3 min-h-11 w-full rounded-full bg-teal text-card" onClick={() => apply(startProgram(game, indication))}>
           Nuova molecola · 70 mila €
         </button>
-        {!lab || !scientist ? <p className="mt-2 text-sm text-mist">Serve un laboratorio con uno scienziato dentro.</p> : null}
       </div>
       {game.pipeline.map((program) => {
         const step = NEXT_STAGE[program.stage];
-        const need = program.stage === "discovery" || program.stage === "lead" || program.stage === "preclinical" || program.stage === "phase1" || program.stage === "phase2" || program.stage === "phase3" || program.stage === "dossier";
         return (
           <article key={program.id} className="rounded-xl border border-line bg-card p-3">
             <p className="font-display text-xl">{program.code}</p>
-            <p className="text-sm text-mist">
-              {program.indication} · {STAGE_LABEL[program.stage]}
-              {program.patented ? " · brevettata" : ""}
-            </p>
-            {need ? <p className="mt-2 text-sm">Avanzamento {Math.round(program.progress)}</p> : null}
-            {program.stage === "review" ? <p className="mt-2 text-sm">Revisione {program.authority}: {program.reviewLeft} sett.</p> : null}
+            <p className="text-sm text-mist">{program.indication} · {STAGE_LABEL[program.stage]}{program.patented ? " · brevettata" : ""}</p>
             {program.waiting && step && program.stage !== "dossier" ? (
               <button type="button" className="mt-3 min-h-11 w-full rounded-full bg-ink text-card" onClick={() => apply(advanceProgram(game, program.id))}>
-                {step.label}
-                {step.cost ? ` · ${euro(step.cost)}` : ""}
+                {step.label}{step.cost ? ` · ${euro(step.cost)}` : ""}
               </button>
             ) : null}
             {program.waiting && program.stage === "dossier" ? (
               <div className="mt-3 grid gap-2">
                 {AUTHORITIES.map((authority) => (
                   <button key={authority.id} type="button" className="min-h-11 rounded-full bg-ink text-card" onClick={() => apply(advanceProgram(game, program.id, authority.id))}>
-                    Invia a {authority.name} · {authority.weeks} sett.
+                    Invia a {authority.name}
                   </button>
                 ))}
               </div>
             ) : null}
+            {program.stage === "review" ? <p className="mt-2 text-sm">{program.authority}: {program.reviewLeft} sett.</p> : null}
             {program.stage === "approved" ? (
-              <button type="button" className="mt-3 min-h-11 w-full rounded-full bg-teal text-card" onClick={() => apply(launchProduct(game, program.id))}>
-                Lancia in commercio
-              </button>
+              <button type="button" className="mt-3 min-h-11 w-full rounded-full bg-teal text-card" onClick={() => apply(launchProduct(game, program.id))}>Lancia</button>
             ) : null}
             {program.patented && !["failed", "launched", "licensed", "approved"].includes(program.stage) ? (
-              <button type="button" className="mt-2 min-h-11 w-full rounded-full bg-paper" onClick={() => apply(licenseOut(game, program.id))}>
-                Cedi in licenza
-              </button>
+              <button type="button" className="mt-2 min-h-11 w-full rounded-full bg-paper" onClick={() => apply(licenseOut(game, program.id))}>Cedi in licenza</button>
             ) : null}
           </article>
         );
       })}
-      {!game.pipeline.length ? <p className="text-sm text-mist">Ancora nessuna molecola tua. I contratti pagano le luci.</p> : null}
     </div>
   );
 }
@@ -698,28 +695,20 @@ function TechTree({ game, apply }: { game: Game; apply: (g: Game | string) => vo
   const eras = ["early", "mid", "late", "oltre"] as const;
   return (
     <div className="mx-auto grid max-w-lg gap-4">
-      <div>
-        <h2 className="font-display text-3xl">Tecniche</h2>
-        <p className="text-sm text-mist">Scienza {Math.floor(game.science)}. Gli scienziati la producono anche fuori dal laboratorio, più in fretta se sono dentro.</p>
-      </div>
+      <h2 className="font-display text-3xl">Tecniche</h2>
+      <p className="text-sm text-mist">Scienza {Math.floor(game.science)}. Gli scienziati la producono anche in panchina.</p>
       {eras.map((era) => (
         <section key={era} className="grid gap-2">
           <h3 className="font-display text-2xl">{ERA_LABEL[era]}</h3>
           {TECH.filter((tech) => tech.era === era).map((tech) => {
-            const owned = hasTech(game, tech.id);
-            const missing = tech.need.filter((id) => !hasTech(game, id));
+            const owned = hasTech(game, tech.id as TechId);
             return (
               <article key={tech.id} className="rounded-xl border border-line bg-card p-3">
                 <p className="font-medium">{tech.name}</p>
                 <p className="text-sm text-mist">{tech.blurb}</p>
-                <p className="mt-1 text-sm">
-                  {owned ? "In casa" : `${euro(tech.cash)} · scienza ${tech.sci}`}
-                  {missing.length ? ` · prima ${missing.map((id) => TECH.find((t) => t.id === id)?.name).join(", ")}` : ""}
-                </p>
+                <p className="mt-1 text-sm">{owned ? "In casa" : `${euro(tech.cash)} · scienza ${tech.sci}`}{tech.need.length ? ` · prima ${tech.need.map((id) => TECH.find((t) => t.id === id)?.name).join(", ")}` : ""}</p>
                 {owned ? null : (
-                  <button type="button" className="mt-2 min-h-11 w-full rounded-full bg-teal text-card" onClick={() => apply(buyTech(game, tech.id as TechId))}>
-                    Sblocca
-                  </button>
+                  <button type="button" className="mt-2 min-h-11 w-full rounded-full bg-teal text-card" onClick={() => apply(buyTech(game, tech.id))}>Sblocca</button>
                 )}
               </article>
             );
@@ -735,36 +724,29 @@ function Team({ game, apply }: { game: Game; apply: (g: Game | string) => void }
     <div className="mx-auto grid max-w-lg gap-4">
       <h2 className="font-display text-3xl">Persone</h2>
       {game.staff.map((person) => {
-        const home = buildingById(game, person.buildingId);
+        const home = game.rooms.find((r) => r.id === person.roomId);
         return (
-          <article key={person.id} className="flex items-center justify-between gap-2 rounded-xl border border-line bg-card px-3 py-2">
-            <span>
-              <span className="block font-medium">{person.name}</span>
-              <span className="text-sm text-mist">
-                {ROLE_LABEL[person.role]} · abilità {person.skill} · {euro(person.salary)}/sett.
-                {home ? ` · ${catalog(home.kind).name}` : " · in panchina"}
+          <article key={person.id} className="rounded-xl border border-line bg-card px-3 py-2">
+            <div className="flex items-center justify-between gap-2">
+              <span>
+                <span className="block font-medium">{person.name}</span>
+                <span className="text-sm text-mist">{ROLE_LABEL[person.role]} · abilità {person.skill} · {euro(person.salary)}/sett.{home ? ` · ${roomDef(home.type).name}` : " · in panchina"}</span>
               </span>
-            </span>
-            <button type="button" className="min-h-11 rounded-full px-3 text-sm text-mist" onClick={() => apply(dismiss(game, person.id))}>
-              Esci
-            </button>
+              <button type="button" className="min-h-11 rounded-full px-3 text-sm text-mist" onClick={() => apply(dismiss(game, person.id))}>Esci</button>
+            </div>
+            {person.skill < 6 ? (
+              <button type="button" className="mt-2 min-h-11 w-full rounded-full bg-paper text-sm" onClick={() => apply(train(game, person.id))}>
+                Forma · {euro(18_000 + person.skill * 8_000)}
+              </button>
+            ) : null}
           </article>
         );
       })}
-      {game.staff.map((person) =>
-        person.skill < 6 ? (
-          <button key={`t-${person.id}`} type="button" className="min-h-11 rounded-xl border border-line px-3 text-left text-sm" onClick={() => apply(train(game, person.id))}>
-            Forma {person.name} · {euro(18_000 + person.skill * 8_000)}
-          </button>
-        ) : null,
-      )}
       <h3 className="font-display text-2xl">Candidati</h3>
       {game.candidates.map((person) => (
         <button key={person.id} type="button" className="min-h-14 rounded-xl border border-line bg-card px-3 text-left" onClick={() => apply(hire(game, person.id))}>
           <span className="block font-medium">Assumi {person.name}</span>
-          <span className="text-sm text-mist">
-            {ROLE_LABEL[person.role]} · abilità {person.skill} · {euro(person.salary)}/sett. · ingresso 12 mila €
-          </span>
+          <span className="text-sm text-mist">{ROLE_LABEL[person.role]} · abilità {person.skill} · {euro(person.salary)}/sett. · ingresso 12 mila €</span>
         </button>
       ))}
     </div>
@@ -777,51 +759,34 @@ function World({ game, apply, armReset, reset }: { game: Game; apply: (g: Game |
   return (
     <div className="mx-auto grid max-w-lg gap-4">
       <h2 className="font-display text-3xl">Mondo</h2>
+      <p className="text-sm text-mist">Reputazione {Math.round(game.reputation)} · qualità {Math.round(game.quality)} · quota {Math.round(game.playerShare)}% · copertura {Math.round(coverage(game))}</p>
+      <p className="text-sm text-mist">Materie {euro(matPrice(game, "api"))} l'API · domanda {Math.round(demandOf(game))}{game.mod ? ` · ${game.mod.label}` : ""}</p>
       <div className="flex h-16 items-end gap-1 rounded-xl bg-card px-3 py-2">
         {game.history.map((value, index) => {
           const height = max === min ? 50 : ((value - min) / (max - min)) * 100;
           return <div key={index} className="flex-1 rounded-sm bg-teal" style={{ height: `${Math.max(8, height)}%` }} />;
         })}
       </div>
-      <p className="text-sm text-mist">
-        Principio attivo {euro(apiPrice(game))} · domanda {Math.round(demandOf(game))}
-        {game.mod ? ` · ${game.mod.label}` : ""}
-      </p>
       {game.products.map((product) => (
         <article key={product.id} className="rounded-xl border border-line bg-card p-3">
-          <p className="font-medium">
-            {product.code} · {product.indication}
-          </p>
-          <p className="text-sm text-mist">Prezzo indice {product.price}{product.patentLeft ? ` · brevetto ${product.patentLeft} sett.` : " · senza esclusiva"}</p>
+          <p className="font-medium">{product.code} · {product.indication}</p>
+          <p className="text-sm text-mist">Prezzo {product.price}{product.patentLeft ? ` · brevetto ${product.patentLeft} sett.` : ""}</p>
           <div className="mt-2 flex gap-2">
-            <button type="button" className="min-h-11 flex-1 rounded-full bg-paper" onClick={() => apply(setPrice(game, product.id, product.price - 5))}>
-              Abbassa
-            </button>
-            <button type="button" className="min-h-11 flex-1 rounded-full bg-paper" onClick={() => apply(setPrice(game, product.id, product.price + 5))}>
-              Alza
-            </button>
+            <button type="button" className="min-h-11 flex-1 rounded-full bg-paper" onClick={() => apply(setPrice(game, product.id, product.price - 5))}>Abbassa</button>
+            <button type="button" className="min-h-11 flex-1 rounded-full bg-paper" onClick={() => apply(setPrice(game, product.id, product.price + 5))}>Alza</button>
           </div>
         </article>
       ))}
       {game.rivals.map((rival) => (
         <article key={rival.id} className="rounded-xl bg-card px-3 py-2">
-          <div className="flex items-baseline justify-between gap-2">
-            <p className="font-medium">{rival.name}</p>
-            <p className="font-display">{Math.round(rival.share)}%</p>
-          </div>
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-paper">
-            <div className="h-full bg-ink" style={{ width: `${Math.min(100, rival.share)}%` }} />
-          </div>
-          <p className="mt-1 text-sm text-mist">{rival.note}</p>
+          <div className="flex justify-between"><p className="font-medium">{rival.name}</p><p className="font-display">{Math.round(rival.share)}%</p></div>
+          <p className="text-sm text-mist">{rival.note}</p>
         </article>
       ))}
       <h3 className="font-display text-2xl">Registro</h3>
       <ul className="grid gap-2">
-        {game.log.slice(0, 12).map((item, index) => (
-          <li key={index} className="text-sm leading-snug">
-            <span className="text-mist">s{item.week} · </span>
-            {item.text}
-          </li>
+        {game.log.slice(0, 14).map((item, index) => (
+          <li key={index} className="text-sm leading-snug"><span className="text-mist">s{item.week} · </span>{item.text}</li>
         ))}
       </ul>
       <button type="button" className="min-h-11 rounded-full border border-line text-mist" onClick={reset}>
