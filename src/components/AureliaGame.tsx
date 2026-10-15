@@ -7,7 +7,6 @@ import {
   BRANCH_LABEL,
   ERA_LABEL,
   GEAR,
-  GOAL_TEXT,
   INDICATION_BOOK,
   INDICATIONS,
   MAT_LABEL,
@@ -22,6 +21,7 @@ import {
   anchorsOf,
   assign,
   audit,
+  briefOf,
   buyParcel,
   buyTech,
   canCorridor,
@@ -45,6 +45,8 @@ import {
   headroom,
   hire,
   hireCost,
+  houseGate,
+  jobPace,
   installGear,
   labPace,
   launchProduct,
@@ -74,12 +76,14 @@ import {
   seatsFor,
   scienceRate,
   sellerOn,
+  siteRead,
   setAutoBuy,
   setPrice,
   SHAPE_LABEL,
   slotsFor,
   staffIn,
   startProgram,
+  takeProcess,
   techDef,
   techGate,
   techOpens,
@@ -256,7 +260,6 @@ export function AureliaGame() {
     setCell(hit);
   }
 
-  const goal = game ? GOAL_TEXT.find((item) => !game.goals.includes(item.id)) : null;
   const waiting = game ? waitingProgram(game) : null;
   const power = game ? powerReport(game) : null;
 
@@ -356,10 +359,14 @@ export function AureliaGame() {
           </div>
         )}
 
-        {tab === "map" && !room && !cell && goal ? (
-          <div className="pointer-events-none absolute bottom-3 left-3 right-16 truncate rounded-full border border-white/70 bg-card/90 px-3 py-2 text-sm shadow-md backdrop-blur">
-            <span className="text-mist">Ora · </span>
-            {goal.label}
+        {tab === "map" && !room && !cell ? (
+          <div className="absolute bottom-3 left-3 right-16 grid gap-1">
+            {briefOf(game).slice(0, 2).map((item) => (
+              <button key={item.text} type="button" onClick={() => item.tab !== "map" && setTab(item.tab)} className="truncate rounded-full border border-white/70 bg-card/90 px-3 py-2 text-left text-sm shadow-md backdrop-blur">
+                <span className="text-mist">Ora · </span>
+                {item.text}
+              </button>
+            ))}
           </div>
         ) : null}
 
@@ -455,7 +462,7 @@ function Sheet({ title, onClose, children, back }: { title: string; onClose: () 
 function scienceHint(game: Game) {
   const rate = scienceRate(game);
   const pace = rate.toFixed(1).replace(".", ",");
-  if (rate > 0) return `Scienza circa ${pace} a settimana. La fanno gli scienziati in panchina, o nel lab di scoperta se l'LC-MS è acceso. I contratti «Processo» ne lasciano altra a fine lavoro.`;
+  if (rate > 0) return `Scienza circa ${pace} a settimana, più un po' da ogni contratto chiuso pulito. La fanno gli scienziati in panchina, o nel lab di scoperta se l'LC-MS è acceso.`;
   return "Nessuno produce scienza. Lascia uno scienziato in panchina, oppure mettilo nel lab di scoperta con l'LC-MS acceso.";
 }
 
@@ -696,7 +703,7 @@ function Deals({ game, apply }: { game: Game; apply: (g: Game | string) => void 
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal">Sala</p>
         <h2 className="font-display text-4xl leading-none">Contratti</h2>
         <p className="mt-2 text-sm leading-snug text-mist">
-          {sellerOn(game) ? "La sala tiene quattro buste e alza l'incasso di ogni lotto." : "Tre buste alla volta. Con la sala e un commerciale diventano quattro, e pagano meglio."}
+          {sellerOn(game) ? "La sala tiene quattro buste e alza l'incasso di ogni lotto." : "Tre buste alla volta. Con la sala e un commerciale diventano quattro, e pagano meglio."} {siteRead(game)}
         </p>
       </div>
 
@@ -723,6 +730,28 @@ function Deals({ game, apply }: { game: Game; apply: (g: Game | string) => void 
             </div>
           ))}
         </div>
+      </section>
+
+      <section className="grid gap-2">
+        <h3 className="font-display text-2xl">Processi di sito</h3>
+        <p className="text-sm text-mist">Ogni lotto fa conoscere il processo di quella casa. A 50% la linea è pratica. Portarlo in casa costa 80 mila € e 6 scienza: la molecola parte dal lead, non dalla scoperta.</p>
+        {(game.processes ?? []).length === 0 ? <p className="text-sm text-mist">Ancora nessun processo. Firma una busta.</p> : null}
+        {(game.processes ?? []).map((proc) => {
+          const block = proc.house ? null : houseGate(game, proc.id);
+          return (
+            <article key={proc.id} className={`px-4 py-3 ${proc.house ? "dossier" : "letter pl-5"}`}>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-teal">{proc.house ? "In casa" : TIER_LABEL[proc.tier]}</p>
+              <h4 className="mt-1 font-display text-2xl leading-none">{proc.name}</h4>
+              <p className="mt-1 text-sm text-mist">{proc.runs} lotti puliti · {proc.scrap} scarti · noto al {Math.round(proc.known)}%</p>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-line">
+                <div className="h-full rounded-full bg-teal" style={{ width: `${Math.min(100, proc.known)}%` }} />
+              </div>
+              {proc.house ? <p className="mt-2 text-sm">La linea lo ricorda ancora. La pagina è nel quaderno.</p> : block ? <p className="mt-2 text-sm text-amber">{block}</p> : (
+                <button type="button" className="mt-3 min-h-12 w-full rounded-full bg-ink font-semibold text-card" onClick={() => apply(takeProcess(game, proc.id))}>Porta in casa · 80 mila € · 6 scienza</button>
+              )}
+            </article>
+          );
+        })}
       </section>
 
       <section className="rounded-2xl border border-line bg-card p-3">
@@ -801,6 +830,7 @@ function JobCard({ game, job, apply }: { game: Game; job: Job; apply: (g: Game |
         <p className={`mt-2 text-sm ${late ? "text-amber" : "text-white/70"}`}>
           {room ? roomDef(room.type).name : "Linea"} · {dueLabel(game, job)}
           {job.scrap ? ` · ${job.scrap} scarti` : ""}
+          <span className="block">{jobPace(game, job)}</span>
         </p>
       </article>
     );
@@ -809,7 +839,7 @@ function JobCard({ game, job, apply }: { game: Game; job: Job; apply: (g: Game |
     <article className="letter queue px-4 py-3 pl-5">
       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber">In coda · {SHAPE_LABEL[job.shape] ?? TIER_LABEL[job.tier]}</p>
       <h4 className="mt-1 font-display text-2xl leading-none">{job.client}</h4>
-      <p className={`mt-1 text-sm ${late ? "text-amber" : "text-mist"}`}>{dueLabel(game, job)}{job.prefer ? "" : " · prima linea libera"}</p>
+      <p className={`mt-1 text-sm ${late ? "text-amber" : "text-mist"}`}>{dueLabel(game, job)} · {jobPace(game, job)}</p>
       {lines.length ? (
         <div className="mt-2 flex flex-wrap gap-1.5">
           <button type="button" className={`min-h-11 rounded-full px-3 text-sm ${job.prefer ? "bg-card" : "bg-ink text-card"}`} onClick={() => apply(pinJob(game, job.id, null))}>Prima libera</button>
@@ -846,6 +876,12 @@ function Letter({ game, offer, open, apply, toggle, signed }: { game: Game; offe
         <span className="seal shrink-0" style={{ background: TIER_INK[offer.tier] }}>{TIER_SEAL[offer.tier]}</span>
       </div>
       <p className="mt-3 text-sm leading-snug">{offer.blurb}</p>
+      {game.processes?.find((item) => item.id === offer.processId) ? (
+        <p className="mt-2 text-sm">
+          {game.processes.find((item) => item.id === offer.processId)!.name} · noto al {Math.round(game.processes.find((item) => item.id === offer.processId)!.known)}%.
+          {game.processes.find((item) => item.id === offer.processId)!.known >= 40 ? " La linea è già pratica." : " Processo nuovo: un filo più lento."}
+        </p>
+      ) : null}
       <p className="mt-2 font-display text-3xl leading-none text-teal">{euro(offer.pay)}</p>
       <p className="mt-1 text-sm text-mist">
         {offer.batches} lotti · {offer.dueWeeks ?? 8} sett. · qualità {offer.quality}
@@ -901,7 +937,7 @@ function Research({ game, apply, indication, setIndication }: { game: Game; appl
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal">Quaderno</p>
         <h2 className="font-display text-4xl leading-none">Ricerca</h2>
-        <p className="mt-2 text-sm leading-snug text-mist">I contratti pagano il laboratorio. La qualità dei lotti entra nei trial. La scienza sblocca le tecniche, oppure spinge una pagina.</p>
+        <p className="mt-2 text-sm leading-snug text-mist">I contratti pagano il laboratorio. Un processo maturo, portato in casa, parte già dal lead. La qualità dei lotti entra nei trial.</p>
       </div>
 
       <section className="notebook px-4 py-3 pl-5">
@@ -1210,6 +1246,7 @@ function World({ game, apply, armReset, reset }: { game: Game; apply: (g: Game |
     <div className="mx-auto grid max-w-lg gap-4">
       <h2 className="font-display text-3xl">Mondo</h2>
       <p className="text-sm text-mist">Reputazione {Math.round(game.reputation)} · qualità {Math.round(game.quality)} · quota {Math.round(game.playerShare)}% · copertura {Math.round(coverage(game))}</p>
+      <p className="text-sm text-mist">{siteRead(game)}</p>
       <p className="text-sm text-mist">Materie {euro(matPrice(game, "api"))} l'API · domanda {Math.round(demandOf(game))}{game.mod ? ` · ${game.mod.label}` : ""}</p>
       <div className="flex h-16 items-end gap-1 rounded-xl bg-card px-3 py-2">
         {game.history.map((value, index) => {
@@ -1230,7 +1267,8 @@ function World({ game, apply, armReset, reset }: { game: Game; apply: (g: Game |
       {game.rivals.map((rival) => (
         <article key={rival.id} className="rounded-xl bg-card px-3 py-2">
           <div className="flex justify-between"><p className="font-medium">{rival.name}</p><p className="font-display">{Math.round(rival.share)}%</p></div>
-          <p className="text-sm text-mist">{rival.note}</p>
+          <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-line"><div className="h-full rounded-full bg-ink" style={{ width: `${Math.min(100, (rival.share / 50) * 100)}%` }} /></div>
+          <p className="mt-1 text-sm text-mist">{rival.note}{rival.share > game.reputation * 0.65 ? " Ti tiene sotto pressione." : ""}</p>
         </article>
       ))}
       <h3 className="font-display text-2xl">Registro</h3>

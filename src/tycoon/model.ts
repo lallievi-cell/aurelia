@@ -111,6 +111,7 @@ export type Offer = {
   clauses: Clauses;
   blurb: string;
   science: number;
+  processId: string;
 };
 export type Job = Offer & {
   status: "queued" | "active";
@@ -137,6 +138,7 @@ export type Program = {
   heat: number;
   rivalId: string | null;
 };
+export type Process = { id: string; clientId: string; name: string; tier: Tier; known: number; runs: number; scrap: number; house: boolean };
 export type Product = { id: string; code: string; indication: string; price: number; patented: boolean; patentLeft: number };
 export type Rival = { id: string; name: string; share: number; note: string };
 export type LogItem = { week: number; text: string; tone: Tone };
@@ -167,6 +169,7 @@ export type Game = {
   clients: Client[];
   offers: Offer[];
   jobs: Job[];
+  processes: Process[];
   pipeline: Program[];
   products: Product[];
   rivals: Rival[];
@@ -554,6 +557,7 @@ export function newGame(name: string, focus: Focus): Game {
     clients: clientBook(),
     offers: [],
     jobs: [],
+    processes: [],
     pipeline: [],
     products: [],
     rivals: [
@@ -1355,7 +1359,32 @@ function priced(base: number, clauses: Clauses) {
   if (clauses.penalty) m *= 1.08;
   return Math.round(base * m);
 }
-function patchOffer(o: Offer) {
+const ROUTES = ["sale sodica", "estere metilico", "intermedio clorurato", "base libera", "sale mesilato", "forma idrata", "nanosuspensione", "frammento anticorpale", "proteina fusa", "peptide corto"];
+
+function ensureProcess(g: Game, clientId: string, clientName: string, tier: Tier) {
+  g.processes ??= [];
+  const open = g.processes.find((item) => item.clientId === clientId && item.tier === tier && !item.house);
+  if (open) return open;
+  const n = g.processes.filter((item) => item.clientId === clientId).length;
+  const salt = clientName.charCodeAt(0) + clientId.charCodeAt(0) * 3 + n * 4 + tier.length;
+  const route = ROUTES[salt % ROUTES.length]!;
+  const created: Process = { id: nid(g, "k"), clientId, name: `${clientName} · ${route}`, tier, known: 0, runs: 0, scrap: 0, house: false };
+  g.processes.push(created);
+  return created;
+}
+function learnProcess(g: Game, job: Job, clean: boolean) {
+  const proc = g.processes.find((item) => item.id === job.processId);
+  if (!proc || proc.house) return;
+  if (clean) {
+    proc.runs += 1;
+    proc.known = clamp(proc.known + 8, 0, 100);
+  } else {
+    proc.scrap += 1;
+    proc.known = clamp(proc.known + 3, 0, 100);
+  }
+  if (proc.known >= 50 && proc.known - (clean ? 8 : 3) < 50) pushLog(g, `${proc.name} è maturo. Puoi portarlo in casa.`, "good");
+}
+function patchOffer(g: Game, o: Offer) {
   o.shape ??= o.tier === "pilota" ? "campione" : "fornitura";
   o.clauses ??= { rush: false, tight: false, penalty: false };
   o.basePay ??= o.pay;
@@ -1366,9 +1395,11 @@ function patchOffer(o: Offer) {
   o.clientId ??= BOOK.find((b) => b.name === o.client)?.id ?? "lumen";
   o.quality = o.baseQuality + (o.clauses.tight ? 8 : 0);
   o.pay = priced(o.basePay, o.clauses);
+  g.processes ??= [];
+  if (!o.processId) o.processId = ensureProcess(g, o.clientId, o.client, o.tier).id;
 }
 function patchJob(g: Game, j: Job) {
-  patchOffer(j);
+  patchOffer(g, j);
   j.due ??= g.week + j.dueWeeks;
   j.scrap ??= 0;
   j.prefer ??= null;
@@ -1391,7 +1422,8 @@ function heal(g: Game) {
   for (const member of g.candidates) patchPerson(member, false, g.week);
   if (!Array.isArray(g.clients) || g.clients.length === 0) g.clients = clientBook();
   else for (const seed of clientBook()) if (!g.clients.some((c) => c.id === seed.id)) g.clients.push(seed);
-  for (const offer of g.offers) patchOffer(offer);
+  g.processes ??= [];
+  for (const offer of g.offers) patchOffer(g, offer);
   for (const job of g.jobs) patchJob(g, job);
   g.pipeline ??= [];
   for (const program of g.pipeline) {
@@ -1424,10 +1456,33 @@ function fitsTier(tier: Tier, kind: "pilot" | "plant" | "sterile", m: number) {
 function trustMul(trust: number) {
   return 0.94 + trust / 500;
 }
+export function deskMood(g: Game) {
+  const rival = g.rivals.length ? Math.max(...g.rivals.map((item) => item.share)) : 20;
+  const rep = 0.92 + g.reputation / 550;
+  const press = 1 - clamp((rival - 24) / 450, 0, 0.07);
+  const qual = g.quality >= 62 ? 1.04 : g.quality < 34 ? 0.93 : 1;
+  return clamp(rep * press * qual, 0.86, 1.12);
+}
+export function siteRead(g: Game) {
+  const pay = Math.round((deskMood(g) - 1) * 100);
+  const money = Math.abs(pay) < 2 ? "le buste pagano il prezzo pieno" : pay > 0 ? `le buste pagano il ${pay}% in più` : `le buste pagano il ${-pay}% in meno`;
+  const qa = g.staff.some((member) => member.role === "qa" && g.rooms.find((room) => room.id === member.roomId)?.type === "qc");
+  const watch = qa ? "Il QC tiene la qualità." : "Senza un analista in QC la qualità scende, e le buste peggiorano.";
+  return `Reputazione e rivali: ${money}. Un lotto pulito insegna scienza e toglie quota a un rivale. ${watch}`;
+}
+function nudgeRival(g: Game, delta: number) {
+  if (!g.rivals.length) return;
+  const rival = g.rivals[Math.floor(roll(g.week * 5 + g.seq) * g.rivals.length)]!;
+  rival.share = clamp(rival.share + delta, 8, 46);
+}
 function pickClient(g: Game, tier: Tier) {
   const busy = new Set([...g.offers.map((o) => o.clientId), ...g.jobs.map((j) => j.clientId)]);
   let pool = g.clients.filter((c) => !busy.has(c.id));
   if (!pool.length) pool = [...g.clients];
+  if (tier !== "pilota") {
+    const trusted = pool.filter((c) => c.trust >= 32);
+    if (trusted.length) pool = trusted;
+  }
   const taste = pool.filter((c) => c.taste === tier);
   if (taste.length && roll(g.seq + g.week) > 0.35) pool = taste;
   return pool[Math.floor(roll(g.seq * 3 + g.week + pool.length) * pool.length)] ?? g.clients[0]!;
@@ -1446,9 +1501,9 @@ function pushOffer(g: Game, fixed?: { client: Client; tier: Tier; shape: Shape; 
   const dice = roll(g.week * 13 + g.seq);
   let tier: Tier = fixed?.tier ?? "pilota";
   if (!fixed) {
-    if (canBio && dice > 0.74) tier = "sterile";
-    else if (canPrem && dice > 0.56) tier = "premium";
-    else if (canStd && dice > 0.34) tier = "standard";
+    if (canBio && dice > 0.74 && g.reputation >= 50) tier = "sterile";
+    else if (canPrem && dice > 0.56 && g.reputation >= 40) tier = "premium";
+    else if (canStd && dice > 0.34 && g.reputation >= 36) tier = "standard";
   }
   const shape = fixed?.shape ?? pickShape(g, tier, dice);
   const client = fixed?.client ?? pickClient(g, tier);
@@ -1458,7 +1513,7 @@ function pushOffer(g: Game, fixed?: { client: Client; tier: Tier; shape: Shape; 
   const shapeMul = shape === "trasferimento" ? 0.7 : shape === "fornitura" ? 1.06 : 1;
   const scale = tier === "premium" && hasMastery(g, "stabilita") ? 1.04 : 1;
   const clauses: Clauses = shape === "urgenza" ? { rush: true, tight: false, penalty: true } : { rush: false, tight: false, penalty: false };
-  const basePay = Math.round(batches * payEach * shapeMul * trustMul(client.trust) * (fixed?.payMul ?? 1) * scale);
+  const basePay = Math.round(batches * payEach * shapeMul * trustMul(client.trust) * deskMood(g) * (fixed?.payMul ?? 1) * scale);
   const baseQuality = tier === "pilota" ? 46 : tier === "standard" ? 58 : tier === "premium" ? 70 : 74;
   g.offers.push({
     id: nid(g, "o"),
@@ -1481,6 +1536,7 @@ function pushOffer(g: Game, fixed?: { client: Client; tier: Tier; shape: Shape; 
     clauses,
     blurb: BLURB[shape],
     science: shape === "trasferimento" ? 3 : 0,
+    processId: ensureProcess(g, client.id, client.name, tier).id,
   });
   return true;
 }
@@ -1528,7 +1584,7 @@ export function tuneOffer(g: Game, id: string, key: keyof Clauses) {
   offer.clauses[key] = !offer.clauses[key];
   offer.pay = priced(offer.basePay, offer.clauses);
   offer.quality = offer.baseQuality + (offer.clauses.tight ? 8 : 0);
-  offer.dueWeeks = spanWeeks(offer.shape, offer.batches, offer.clauses.rush);
+  offer.dueWeeks = spanWeeks(offer.shape, offer.batches, offer.clauses.rush) + (offer.tier === "premium" && hasTech(next, "stabilita") ? (hasMastery(next, "stabilita") ? 3 : 2) : 0);
   return next;
 }
 
@@ -1581,6 +1637,26 @@ export function pinJob(g: Game, id: string, roomId: string | null) {
   if (roomId && !deskLines(next, job.tier).some((line) => line.id === roomId && line.fit)) return "Quella linea non regge questo contratto.";
   job.prefer = roomId;
   return next;
+}
+
+export function jobPace(g: Game, job: Job) {
+  const dueLeft = (job.due ?? g.week + (job.dueWeeks ?? 8)) - g.week;
+  const shortShelf = (["api", "solvent", "eccipient", "vials"] as const).find((key) => job[key] > 0 && have(g, key) < job[key] && capOf(g, key) < job[key]);
+  if (job.status === "active" && job.roomId) {
+    const room = g.rooms.find((item) => item.id === job.roomId);
+    const line = room ? lineOf(g, room) : null;
+    if (!room || !line) return "La linea è spenta. La data scorre lo stesso.";
+    if (shortShelf) return "Lo scaffale è pieno: il lotto non esce.";
+    if (!g.autoBuy && (["api", "solvent", "eccipient", "vials"] as const).some((key) => job[key] > have(g, key))) return "Riordino spento e manca materiale.";
+    const left = Math.max(0.2, job.batches - job.done - job.progress);
+    const weeks = Math.max(1, Math.ceil(left / Math.max(0.2, line.vel)));
+    if (dueLeft >= 0 && weeks > dueLeft) return `Ci vogliono circa ${weeks} sett., ne restano ${dueLeft}.`;
+    return `Circa ${weeks} ${weeks === 1 ? "settimana" : "settimane"} a questo ritmo.`;
+  }
+  const lines = deskLines(g, job.tier);
+  if (!lines.length) return "Nessuna linea. La data scade anche se il lotto è fermo.";
+  if (!lines.some((line) => line.ready)) return lines.find((line) => line.fit)?.why ?? "Nessuna linea adatta. La data scorre.";
+  return dueLeft < 4 ? "In coda, e la data è vicina." : "Parte appena la linea è libera.";
 }
 
 export function coverage(g: Game) {
@@ -1654,7 +1730,9 @@ function produce(g: Game) {
     const line = room ? lineOf(g, room) : null;
     if (!room || !line) continue;
     const okMats = () => tryFill(g, "api", job.api) && tryFill(g, "solvent", job.solvent) && tryFill(g, "eccipient", job.eccipient) && tryFill(g, "vials", job.vials);
-    job.progress = Math.min(job.batches - job.done, job.progress + line.vel);
+    const proc = g.processes.find((item) => item.id === job.processId);
+    const practiced = 1 + ((proc?.known ?? 0) / 100) * 0.15;
+    job.progress = Math.min(job.batches - job.done, job.progress + line.vel * practiced);
     let warned = false;
     while (job.progress >= 1 && job.done < job.batches) {
       if (!okMats() || have(g, "api") < job.api || have(g, "solvent") < job.solvent || have(g, "eccipient") < job.eccipient || have(g, "vials") < job.vials) {
@@ -1676,13 +1754,17 @@ function produce(g: Game) {
       if (line.kind === "sterile" && hasMastery(g, "asettico")) fail -= 0.02;
       if (staffIn(g, room.id, "operator").some((member) => member.trait === "preciso")) fail -= 0.012;
       if (g.staff.some((member) => member.trait === "preciso" && member.role === "qa" && g.rooms.find((r) => r.id === member.roomId)?.type === "qc")) fail -= 0.008;
+      const known = g.processes.find((item) => item.id === job.processId)?.known ?? 0;
+      fail -= (known / 100) * 0.05;
       fail = clamp(fail, 0.02, 0.45);
       if (roll(g.week * 17 + job.done + g.seq) < fail) {
         job.scrap += 1;
+        learnProcess(g, job, false);
         g.quality = clamp(g.quality - 2, 0, 100);
         g.reputation = clamp(g.reputation - 2, 0, 100);
         const client = g.clients.find((c) => c.id === job.clientId);
         if (client) client.trust = clamp(client.trust - 2, 0, 100);
+        nudgeRival(g, 0.5);
         if (job.clauses.penalty && !job.penalScrap) {
           const hit = Math.round((job.pay / job.batches) * 0.4);
           g.cash -= hit;
@@ -1691,6 +1773,7 @@ function produce(g: Game) {
         } else pushLog(g, `Lotto ${job.client} fuori specifica.`, "bad");
       } else {
         job.done += 1;
+        learnProcess(g, job, true);
         g.stats.batches += 1;
         let slice = Math.round(job.pay / job.batches);
         if (blister) slice = Math.round(slice * (1 + 0.05 * blister));
@@ -1712,6 +1795,13 @@ function produce(g: Game) {
             g.science += job.science;
             pushLog(g, `${job.client}: il processo resta, +${job.science} scienza.`, "good");
           }
+          const clean = job.done;
+          if (clean > 0 && g.staff.some((member) => member.role === "scientist")) {
+            const learned = Math.round(clean * 0.4 * 10) / 10;
+            g.science += learned;
+            pushLog(g, `Dal lavoro di ${job.client} il sito impara +${learned.toFixed(1).replace(".", ",")} scienza.`, "good");
+          }
+          nudgeRival(g, job.scrap > 0 ? 0.4 : -0.8);
           pushLog(g, `Contratto ${job.client} chiuso.`, "good");
           followOn(g, job);
         }
@@ -1934,6 +2024,51 @@ export function pushScience(g: Game, id: string) {
   return next;
 }
 
+export function houseGate(g: Game, id: string): string | null {
+  const proc = g.processes.find((item) => item.id === id);
+  if (!proc || proc.house) return proc ? "Già in casa." : "Processo assente.";
+  if (proc.known < 50) return `Noto al ${Math.round(proc.known)}%. A 50 entra in casa.`;
+  if (!g.rooms.some((room) => room.type === "discovery" && staffIn(g, room.id, "scientist").length > 0 && hasGear(g, "banco"))) return "Serve il lab di scoperta, con banco e uno scienziato.";
+  const active = g.pipeline.filter((item) => !["failed", "launched", "licensed"].includes(item.stage)).length;
+  if (active >= 1 + (hasTech(g, "piattaforma") ? 1 : 0)) return "La pipeline è piena.";
+  if (g.science < 6) return "Servono 6 punti scienza.";
+  if (g.cash < 80_000) return "Servono 80 mila €.";
+  return null;
+}
+
+export function takeProcess(g: Game, id: string) {
+  const blocked = houseGate(g, id);
+  if (blocked) return blocked;
+  const next = structuredClone(g) as Game;
+  heal(next);
+  const proc = next.processes.find((item) => item.id === id);
+  if (!proc) return g;
+  next.cash -= 80_000;
+  next.science -= 6;
+  proc.house = true;
+  const modality: Modality = proc.tier === "sterile" ? "biologico" : "chimica";
+  const indication = proc.tier === "sterile" ? "Immunologia" : proc.tier === "premium" ? "Oncologia" : proc.tier === "standard" ? "Metabolico" : "Infezioni";
+  const code = `AUR-${140 + next.pipeline.length}`;
+  next.pipeline.push({
+    id: nid(next, "r"),
+    code,
+    indication,
+    stage: "lead",
+    progress: 1,
+    waiting: false,
+    reviewLeft: 0,
+    authority: null,
+    patented: false,
+    modality,
+    heat: 0,
+    rivalId: null,
+  });
+  pushLog(next, `${proc.name} entra in casa come ${code}. Parte dal lead, non dalla scoperta.`, "good");
+  markGoals(next);
+  refreshChapter(next);
+  return next;
+}
+
 export function startProgram(g: Game, indication: string, modality: Modality = "chimica") {
   if (!g.rooms.some((r) => r.type === "discovery" && staffIn(g, r.id, "scientist").length && hasGear(g, "banco"))) return "Metti uno scienziato nel lab con il banco chimico.";
   const active = g.pipeline.filter((p) => !["failed", "launched", "licensed"].includes(p.stage)).length;
@@ -2101,6 +2236,8 @@ function upkeep(g: Game) {
     let gain = (inQc.length ? 0.22 : 0.12) * Math.max(...pool.map((member) => member.skill));
     if (pool.some((member) => member.trait === "calmo")) gain *= 1.25;
     g.quality = clamp(g.quality + gain, 0, 100);
+  } else if (g.stats.batches > 0 && g.quality > 30) {
+    g.quality = clamp(g.quality - 0.25, 0, 100);
   }
   if (hasGear(g, "freezer") && !hasGear(g, "allarme") && g.vials > 0 && roll(g.week * 9) < 0.02) {
     g.vials = Math.round(g.vials * 0.8);
@@ -2166,6 +2303,23 @@ function maybeRefinance(g: Game) {
   }
 }
 
+function rivalPress(g: Game) {
+  if (g.week % 7 !== 0 || !g.rivals.length) return;
+  const top = [...g.rivals].sort((a, b) => b.share - a.share)[0]!;
+  if (top.share > g.reputation * 0.65) {
+    const client = [...g.clients].sort((a, b) => b.trust - a.trust)[0];
+    if (client && client.trust > 36) {
+      client.trust = clamp(client.trust - 2, 0, 100);
+      pushLog(g, `${top.name} parla con ${client.name}. La casa si raffredda.`, "bad");
+    }
+    return;
+  }
+  if (g.reputation >= 62 && g.stats.batches >= 4) {
+    top.share = clamp(top.share - 1, 8, 46);
+    pushLog(g, `${top.name} perde un pezzo di mercato.`, "good");
+  }
+}
+
 function markGoals(g: Game) {
   const done = new Set(g.goals);
   const give = (id: string, text: string, cash: number) => {
@@ -2209,6 +2363,7 @@ export function tick(g: Game) {
   research(next);
   commerce(next);
   worldEvent(next);
+  rivalPress(next);
   candidates(next);
   refreshOffers(next, false);
   maybeRefinance(next);
@@ -2221,6 +2376,38 @@ export function tick(g: Game) {
 
 export function waitingProgram(g: Game) {
   return g.pipeline.find((p) => p.waiting && !["failed", "launched", "licensed"].includes(p.stage)) ?? null;
+}
+
+export type BriefTab = "map" | "deals" | "research" | "tech" | "team" | "world";
+export type Brief = { text: string; tab: BriefTab };
+
+export function briefOf(g: Game): Brief[] {
+  const out: Brief[] = [];
+  const push = (text: string, tab: BriefTab) => {
+    if (out.length < 3 && !out.some((item) => item.text === text)) out.push({ text, tab });
+  };
+  const waiting = waitingProgram(g);
+  if (waiting) push(`${waiting.code} aspetta una decisione.`, "research");
+  const late = g.jobs.find((job) => g.week > (job.due ?? g.week));
+  if (late) push(`${late.client} è in ritardo.`, "deals");
+  const power = powerReport(g);
+  if (power.off.length) {
+    const room = g.rooms.find((item) => item.id === power.off[0]!.roomId);
+    push(room ? `${roomDef(room.type).name}: mancano i kW.` : "Mancano kilowatt.", "map");
+  }
+  const queued = g.jobs.find((job) => job.status !== "active");
+  if (queued && !late) push(`${queued.client}: ${jobPace(g, queued)}`, "deals");
+  const ripe = (g.processes ?? []).find((item) => !item.house && item.known >= 50);
+  if (ripe) push(`${ripe.name} è maturo.`, "deals");
+  const qa = g.staff.some((member) => member.role === "qa" && g.rooms.find((room) => room.id === member.roomId)?.type === "qc");
+  if (g.stats.batches > 0 && !qa && g.quality < 58) push("Senza analista in QC la qualità scende.", "team");
+  if (peopleWaiting(g)) push("Qualcuno in panchina ha un posto libero.", "team");
+  const goal = GOAL_TEXT.find((item) => !g.goals.includes(item.id));
+  if (goal && g.stats.batches === 0) push(goal.label, "map");
+  const ready = TECH.find((tech) => !hasTech(g, tech.id) && !techGate(g, tech.id));
+  if (ready) push(`Puoi firmare ${ready.name}.`, "tech");
+  if (goal && g.stats.batches > 0) push(goal.label, "map");
+  return out.slice(0, 3);
 }
 
 export const GOAL_TEXT: { id: string; label: string }[] = [
