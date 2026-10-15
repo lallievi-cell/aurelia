@@ -332,7 +332,7 @@ export function AureliaGame() {
         {tab === "map" ? (
           <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} />
         ) : (
-          <div className="absolute inset-0 overflow-y-auto px-4 py-4 pb-28">
+          <div className="absolute inset-0 min-w-0 overflow-x-hidden overflow-y-auto px-4 py-4 pb-28">
             {tab === "deals" ? <Deals game={game} apply={apply} /> : null}
             {tab === "research" ? <Research game={game} apply={apply} indication={indication} setIndication={setIndication} /> : null}
             {tab === "tech" ? <TechTree game={game} apply={apply} /> : null}
@@ -721,7 +721,7 @@ function Deals({ game, apply }: { game: Game; apply: (g: Game | string) => void 
 
       <section className="grid gap-2">
         <h3 className="font-display text-2xl">Le case</h3>
-        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+        <div className="-mx-4 flex w-[calc(100%+2rem)] min-w-0 gap-2 overflow-x-auto px-4 pb-1">
           {clients.map((client) => (
             <div key={client.id} className="flex w-28 shrink-0 flex-col gap-1 rounded-2xl border border-line bg-card px-2 py-2">
               <span className="seal sm" style={{ background: TIER_INK[client.taste] }}>{TIER_SEAL[client.taste]}</span>
@@ -933,23 +933,23 @@ function Research({ game, apply, indication, setIndication }: { game: Game; appl
   const open = game.pipeline.filter((item) => !["failed", "launched", "licensed"].includes(item.stage)).sort((a, b) => Number(b.waiting) - Number(a.waiting));
   const closed = game.pipeline.filter((item) => ["failed", "launched", "licensed"].includes(item.stage));
   return (
-    <div className="mx-auto grid max-w-lg gap-5">
+    <div className="mx-auto grid w-full min-w-0 max-w-lg grid-cols-[minmax(0,1fr)] gap-5">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal">Quaderno</p>
         <h2 className="font-display text-4xl leading-none">Ricerca</h2>
         <p className="mt-2 text-sm leading-snug text-mist">I contratti pagano il laboratorio. Un processo maturo, portato in casa, parte già dal lead. La qualità dei lotti entra nei trial.</p>
       </div>
 
-      <section className="notebook px-4 py-3 pl-5">
+      <section className="notebook min-w-0 px-4 py-3 pl-5">
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-teal">Nuova pagina</p>
         <div className="mt-2 grid grid-cols-2 gap-2">
           <button type="button" className={`min-h-11 rounded-full text-sm ${modality === "chimica" ? "bg-ink text-card" : "bg-card"}`} onClick={() => setModality("chimica")}>Chimica</button>
           <button type="button" className={`min-h-11 rounded-full text-sm ${modality === "biologico" ? "bg-ink text-card" : "bg-card"}`} onClick={() => setModality("biologico")}>Biologico</button>
         </div>
         <p className="mt-2 text-sm text-mist">{modality === "chimica" ? "Il banco che hai. Se sei partito dai biologici, la scoperta è un filo più lenta." : "Più svelta se sei partito dai biologici. In fase II e III chiede 4 flaconi."}</p>
-        <div className="-mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1">
+        <div className="mt-3 grid grid-cols-2 gap-2">
           {INDICATION_BOOK.map((item) => (
-            <button key={item.name} type="button" className={`min-h-11 shrink-0 rounded-full px-3 text-sm ${item.name === picked.name ? "bg-teal text-card" : "bg-card"}`} onClick={() => setIndication(item.name)}>
+            <button key={item.name} type="button" className={`min-h-11 rounded-2xl px-2 text-sm ${item.name === picked.name ? "bg-teal text-card" : "bg-card"}`} onClick={() => setIndication(item.name)}>
               {item.name}
             </button>
           ))}
@@ -999,11 +999,11 @@ function StudyPage({ game, program, apply }: { game: Game; program: Program; app
   const canPush = !program.waiting && ["discovery", "lead", "preclinical", "dossier"].includes(program.stage);
   const book = INDICATION_BOOK.find((item) => item.name === program.indication);
   return (
-    <article className="notebook px-4 py-3 pl-5">
+    <article className="notebook min-w-0 px-4 py-3 pl-5">
       <div className="flex items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-teal">{STAGE_LABEL[program.stage]} · {(program.modality ?? "chimica") === "biologico" ? "Biologico" : "Chimica"}</p>
-          <h4 className="mt-1 font-display text-3xl leading-none">{program.code}</h4>
+          <h4 className="mt-1 font-display text-3xl leading-none break-words">{program.code}</h4>
           <p className="mt-1 text-sm text-mist">{program.indication}{program.patented ? " · brevettata" : ""}</p>
         </div>
         <span className="seal shrink-0" style={{ background: "#1b7a64" }}>{program.code.slice(-3)}</span>
@@ -1067,7 +1067,7 @@ function TechTree({ game, apply }: { game: Game; apply: (g: Game | string) => vo
           Scienza {Math.floor(game.science)} · entra {rate.toFixed(1).replace(".", ",")}/sett. · {game.tech.length} di {TECH.length} in casa
         </p>
       </header>
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <div className="flex w-full min-w-0 gap-2 overflow-x-auto pb-1">
         {branches.map((id) => {
           const n = ready(id);
           return (
@@ -1168,7 +1168,7 @@ function Team({ game, apply }: { game: Game; apply: (g: Game | string) => void }
           {bench ? ` · ${euro(bench)} fermi in panchina` : ""}
         </p>
       </header>
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <div className="flex w-full min-w-0 gap-2 overflow-x-auto pb-1">
         <button type="button" onClick={() => setRole("tutti")} className={`min-h-11 shrink-0 rounded-full px-3 text-sm ${role === "tutti" ? "bg-ink text-card" : "bg-card"}`}>Tutti</button>
         {ROLE_ORDER.map((id) => (
           <button key={id} type="button" onClick={() => setRole(id)} className={`min-h-11 shrink-0 rounded-full px-3 text-sm ${role === id ? "bg-ink text-card" : "bg-card"}`}>
