@@ -9,6 +9,7 @@ import {
   GEAR,
   INDICATION_BOOK,
   INDICATIONS,
+  LESSONS,
   MAT_LABEL,
   NEXT_STAGE,
   PARCELS,
@@ -17,6 +18,7 @@ import {
   STAGE_LABEL,
   TECH,
   acceptOffer,
+  advanceLesson,
   advanceProgram,
   anchorsOf,
   assign,
@@ -38,6 +40,7 @@ import {
   euro,
   expandRoom,
   gearDef,
+  gearNote,
   gearOn,
   hasGear,
   hasMastery,
@@ -72,11 +75,13 @@ import {
   researchCost,
   researchGate,
   roomDef,
+  roomLevelNote,
   roomOnline,
   seatsFor,
   scienceRate,
   sellerOn,
   siteRead,
+  skipLesson,
   setAutoBuy,
   setPrice,
   SHAPE_LABEL,
@@ -361,7 +366,17 @@ export function AureliaGame() {
           </div>
         )}
 
-        {tab === "map" && !room && !cell ? (
+        {game.lesson < LESSONS.length ? (
+          <div className="absolute bottom-3 left-3 right-16 z-20 rounded-2xl bg-ink px-3 py-3 text-card shadow-lg">
+            <p className="text-[10px] font-semibold tracking-[0.16em] text-teal uppercase">Guida {game.lesson + 1} di {LESSONS.length}</p>
+            <p className="mt-1 font-display text-2xl leading-none">{LESSONS[game.lesson]!.title}</p>
+            <p className="mt-2 text-sm leading-snug text-white/80">{LESSONS[game.lesson]!.text}</p>
+            <div className="mt-3 flex gap-2">
+              <button type="button" className="min-h-11 flex-1 rounded-full text-sm text-white/70" onClick={() => apply(skipLesson(game))}>Salta</button>
+              <button type="button" className="min-h-11 flex-1 rounded-full bg-teal font-semibold" onClick={() => apply(advanceLesson(game))}>{game.lesson === LESSONS.length - 1 ? "Ho capito" : "Avanti"}</button>
+            </div>
+          </div>
+        ) : tab === "map" && !room && !cell ? (
           <div className="absolute bottom-3 left-3 right-16 grid gap-1">
             {briefOf(game).slice(0, 2).map((item) => (
               <button key={item.text} type="button" onClick={() => item.tab !== "map" && setTab(item.tab)} className="truncate rounded-full border border-white/70 bg-card/90 px-3 py-2 text-left text-sm shadow-md backdrop-blur">
@@ -576,6 +591,7 @@ function RoomPanel({ game, id, apply, close }: { game: Game; id: string; apply: 
         {def.w}×{def.h} · livello {room.level} · {online ? "collegata" : "non collegata alla direzione"}
         {room.halt > 0 ? ` · ferma ${room.halt} sett.` : ""} · posti {slotsFor(room)}
       </p>
+      <p className="text-sm">{def.blurb}</p>
       {def.role ? (
         <div className="grid gap-2">
           {crew.map((s) => (
@@ -620,6 +636,7 @@ function RoomPanel({ game, id, apply, close }: { game: Game; id: string; apply: 
             <p className="text-sm text-mist">
               Livello {item.level}/{spec.maxLevel} · {on ? "alimentata" : "senza corrente"}
             </p>
+            <p className="text-sm">{gearNote(item.defId)}</p>
             <div className="mt-2 flex gap-2">
               {item.level < spec.maxLevel ? (
                 <button type="button" className="min-h-11 flex-1 rounded-full bg-ink text-sm text-card" onClick={() => apply(upgradeGear(game, id, index))}>
@@ -636,9 +653,12 @@ function RoomPanel({ game, id, apply, close }: { game: Game; id: string; apply: 
         );
       })}
       {room.level < 3 ? (
-        <button type="button" className="min-h-11 rounded-full bg-ink text-card" onClick={() => apply(upgradeRoom(game, id))}>
-          Livello stanza {room.level + 1} · {euro(upgradeRoomCost(room))}
-        </button>
+        <div>
+          <button type="button" className="min-h-11 w-full rounded-full bg-ink text-card" onClick={() => apply(upgradeRoom(game, id))}>
+            Livello stanza {room.level + 1} · {euro(upgradeRoomCost(room))}
+          </button>
+          <p className="mt-1 text-sm text-mist">{roomLevelNote(room.type)}</p>
+        </div>
       ) : null}
       {def.expand && !room.expanded ? (
         <button type="button" className="min-h-11 rounded-full bg-paper" onClick={() => apply(expandRoom(game, id))}>
@@ -675,8 +695,9 @@ function GearChoices({ game, roomType, roomId, index, apply }: { game: Game; roo
             ))}
           </div>
         ) : (
-          <button key={item.id} type="button" className="min-h-11 rounded-lg bg-paper px-2 text-left text-sm" onClick={() => apply(installGear(game, roomId, index, item.id))}>
-            {item.name} · {euro(item.cost)}
+          <button key={item.id} type="button" className="min-h-11 rounded-lg bg-paper px-2 py-2 text-left text-sm" onClick={() => apply(installGear(game, roomId, index, item.id))}>
+            <span className="block">{item.name} · {euro(item.cost)}</span>
+            <span className="block text-xs text-mist">{gearNote(item.id)}</span>
             {canInstall(game, roomId, index, item.id) ? <span className="block text-mist">{canInstall(game, roomId, index, item.id)}</span> : null}
             <span className="block text-mist">{item.kw ? `${item.id === "reattore" ? "3–5" : item.kw} kW` : item.supply ? `+${item.supply} kW a livello` : "non consuma"}</span>
           </button>
@@ -829,6 +850,13 @@ function JobCard({ game, job, apply }: { game: Game; job: Job; apply: (g: Game |
           <p className="text-sm">{job.done}/{job.batches}</p>
         </div>
         <div className="mt-3"><BatchRail job={job} light /></div>
+        <div className="mt-2 grid grid-cols-3 gap-1 text-center text-[10px] font-semibold uppercase tracking-wide">
+          {(["reazione", "filtro", "rilascio"] as const).map((id, index) => {
+            const at = ["reazione", "filtro", "rilascio"].indexOf(job.step ?? "reazione");
+            const label = id === "reazione" ? "Reazione" : id === "filtro" ? "Filtro" : "Rilascio";
+            return <span key={id} className={`rounded-full py-1 ${index < at ? "bg-teal text-card" : index === at ? "bg-amber text-ink" : "bg-white/10 text-white/45"}`}>{label}</span>;
+          })}
+        </div>
         <p className={`mt-2 text-sm ${late ? "text-amber" : "text-white/70"}`}>
           {room ? roomDef(room.type).name : "Linea"} · {dueLabel(game, job)}
           {job.scrap ? ` · ${job.scrap} scarti` : ""}

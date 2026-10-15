@@ -113,6 +113,7 @@ export type Offer = {
   science: number;
   processId: string;
 };
+export type Step = "reazione" | "filtro" | "rilascio";
 export type Job = Offer & {
   status: "queued" | "active";
   done: number;
@@ -123,6 +124,7 @@ export type Job = Offer & {
   prefer: string | null;
   lateHit: boolean;
   penalScrap: boolean;
+  step: Step;
 };
 export type Program = {
   id: string;
@@ -183,6 +185,7 @@ export type Game = {
   nextEvent: number;
   stats: { batches: number; revenue: number; approvals: number; launches: number; licenses: number };
   history: number[];
+  lesson: number;
 };
 
 export type TechDef = { id: TechId; era: Era; branch: Branch; name: string; blurb: string; deep: string; cash: number; sci: number; need: TechId[] };
@@ -575,6 +578,7 @@ export function newGame(name: string, focus: Focus): Game {
     nextEvent: 10,
     stats: { batches: 0, revenue: 0, approvals: 0, launches: 0, licenses: 0 },
     history: [2_400_000],
+    lesson: 0,
   };
   const hq: Room = { id: "hq", type: "hq", level: 1, c: 1, r: 1, w: 2, h: 2, expanded: false, halt: 0, slots: [{ item: { defId: "scrivania", level: 1 } }, { item: null }] };
   g.rooms.push(hq);
@@ -1407,6 +1411,7 @@ function patchJob(g: Game, j: Job) {
   j.penalScrap ??= false;
   j.progress ??= 0;
   j.done ??= 0;
+  j.step ??= "reazione";
 }
 function patchPerson(s: Staff, hired: boolean, week: number) {
   s.trait ??= traitFor(s.role, s.name.length * 3 + s.skill);
@@ -1426,6 +1431,7 @@ function heal(g: Game) {
   for (const offer of g.offers) patchOffer(g, offer);
   for (const job of g.jobs) patchJob(g, job);
   g.pipeline ??= [];
+  g.lesson ??= 0;
   for (const program of g.pipeline) {
     program.modality ??= "chimica";
     program.heat ??= 0;
@@ -1570,7 +1576,7 @@ export function acceptOffer(g: Game, id: string) {
   const idx = next.offers.findIndex((o) => o.id === id);
   if (idx < 0) return g;
   const offer = next.offers.splice(idx, 1)[0]!;
-  next.jobs.push({ ...offer, status: "queued", done: 0, roomId: null, progress: 0, due: next.week + offer.dueWeeks, scrap: 0, prefer: null, lateHit: false, penalScrap: false });
+  next.jobs.push({ ...offer, status: "queued", done: 0, roomId: null, progress: 0, due: next.week + offer.dueWeeks, scrap: 0, prefer: null, lateHit: false, penalScrap: false, step: "reazione" });
   pushLog(next, `Firmato ${offer.client}: ${offer.batches} lotti entro la settimana ${next.week + offer.dueWeeks}.`, "info");
   markGoals(next);
   return next;
@@ -1648,10 +1654,23 @@ export function jobPace(g: Game, job: Job) {
     if (!room || !line) return "La linea è spenta. La data scorre lo stesso.";
     if (shortShelf) return "Lo scaffale è pieno: il lotto non esce.";
     if (!g.autoBuy && (["api", "solvent", "eccipient", "vials"] as const).some((key) => job[key] > have(g, key))) return "Riordino spento e manca materiale.";
-    const left = Math.max(0.2, job.batches - job.done - job.progress);
-    const weeks = Math.max(1, Math.ceil(left / Math.max(0.2, line.vel)));
-    if (dueLeft >= 0 && weeks > dueLeft) return `Ci vogliono circa ${weeks} sett., ne restano ${dueLeft}.`;
-    return `Circa ${weeks} ${weeks === 1 ? "settimana" : "settimane"} a questo ritmo.`;
+    const note = chainNote(g, job);
+    const order = STEPS;
+    const at = Math.max(0, order.indexOf(job.step ?? "reazione"));
+    const unit = (step: Step) => {
+      const mul = stepMul(g, room, line.kind, step);
+      if (mul <= 0) return 99;
+      return 1 / Math.max(0.15, line.vel * 3 * mul);
+    };
+    if (unit(job.step ?? "reazione") >= 90) return note ?? "Fermo.";
+    let weeks = unit(job.step ?? "reazione") * Math.max(0, 1 - job.progress);
+    for (let i = at + 1; i < order.length; i++) weeks += unit(order[i]!);
+    const whole = order.reduce((sum, step) => sum + unit(step), 0);
+    weeks += Math.max(0, job.batches - job.done - 1) * whole;
+    const rounded = Math.max(1, Math.ceil(weeks));
+    const where = note ? `${note} ` : "";
+    if (dueLeft >= 0 && rounded > dueLeft) return `${where}Ci vogliono circa ${rounded} sett., ne restano ${dueLeft}.`;
+    return `${where}Circa ${rounded} ${rounded === 1 ? "settimana" : "settimane"}.`;
   }
   const lines = deskLines(g, job.tier);
   if (!lines.length) return "Nessuna linea. La data scade anche se il lotto è fermo.";
@@ -1694,6 +1713,37 @@ function tryFill(g: Game, key: MatKey | "vials", need: number) {
   return true;
 }
 
+const STEPS: Step[] = ["reazione", "filtro", "rilascio"];
+
+function filterOn(g: Game, room: Room, kind: "pilot" | "plant" | "sterile") {
+  if (kind === "sterile") return room.slots.some((slot, index) => slot.item?.defId === "isolatore" && gearOn(g, room.id, index));
+  const id = kind === "pilot" ? "filtro-pilota" : "filtro";
+  return room.slots.some((slot, index) => slot.item?.defId === id && gearOn(g, room.id, index));
+}
+
+export function releaseReady(g: Game) {
+  const qc = g.rooms.find((room) => room.type === "qc" && roomOnline(g, room) && room.halt === 0);
+  if (!qc || staffIn(g, qc.id, "qa").length === 0) return false;
+  return hasGear(g, "bilancia") || hasGear(g, "hplc");
+}
+
+function stepMul(g: Game, room: Room, kind: "pilot" | "plant" | "sterile", step: Step) {
+  if (step === "reazione") return 1;
+  if (step === "filtro") return filterOn(g, room, kind) ? 1.15 : 0.35;
+  return releaseReady(g) ? 1.2 : 0;
+}
+
+export function chainNote(g: Game, job: Job) {
+  const step = job.step ?? "reazione";
+  if (job.status !== "active" || !job.roomId) return null;
+  const room = g.rooms.find((item) => item.id === job.roomId);
+  const line = room ? lineOf(g, room) : null;
+  if (!room || !line) return "La linea è spenta. La data scorre lo stesso.";
+  if (step === "reazione") return "In reazione. Il materiale si consuma qui.";
+  if (step === "filtro") return filterOn(g, room, line.kind) ? "Nel filtro." : "Nel filtro, lento: manca il filtro in linea.";
+  return releaseReady(g) ? "In rilascio. Il QC sta firmando." : "In quarantena. Serve il QC collegato, con un analista.";
+}
+
 function produce(g: Game) {
   heal(g);
   for (const job of g.jobs) {
@@ -1732,19 +1782,39 @@ function produce(g: Game) {
     const okMats = () => tryFill(g, "api", job.api) && tryFill(g, "solvent", job.solvent) && tryFill(g, "eccipient", job.eccipient) && tryFill(g, "vials", job.vials);
     const proc = g.processes.find((item) => item.id === job.processId);
     const practiced = 1 + ((proc?.known ?? 0) / 100) * 0.15;
-    job.progress = Math.min(job.batches - job.done, job.progress + line.vel * practiced);
+    const step = job.step ?? "reazione";
+    const mul = stepMul(g, room, line.kind, step);
+    if (mul <= 0) {
+      if (g.week % 2 === 0) {
+        nudgeRival(g, 0.35);
+        pushLog(g, `${job.client} è in quarantena. Un rivale prende quota.`, "bad");
+      }
+      continue;
+    }
+    job.progress = Math.min(8, job.progress + line.vel * 3 * mul * practiced);
     let warned = false;
     while (job.progress >= 1 && job.done < job.batches) {
-      if (!okMats() || have(g, "api") < job.api || have(g, "solvent") < job.solvent || have(g, "eccipient") < job.eccipient || have(g, "vials") < job.vials) {
-        if (!warned && g.week % 3 === 0) pushLog(g, `${job.client} fermo: manca materiale o spazio scaffale.`, "bad");
-        warned = true;
-        break;
+      if (job.step === "reazione") {
+        if (!okMats() || have(g, "api") < job.api || have(g, "solvent") < job.solvent || have(g, "eccipient") < job.eccipient || have(g, "vials") < job.vials) {
+          job.progress = 1;
+          if (!warned && g.week % 3 === 0) pushLog(g, `${job.client} fermo in reazione: manca materiale o spazio scaffale.`, "bad");
+          warned = true;
+          break;
+        }
+        job.progress -= 1;
+        g.api -= job.api;
+        g.solvent -= job.solvent;
+        g.eccipient -= job.eccipient;
+        g.vials -= job.vials;
+        job.step = "filtro";
+        continue;
+      }
+      if (job.step === "filtro") {
+        job.progress -= 1;
+        job.step = "rilascio";
+        continue;
       }
       job.progress -= 1;
-      g.api -= job.api;
-      g.solvent -= job.solvent;
-      g.eccipient -= job.eccipient;
-      g.vials -= job.vials;
       let fail = 0.04 + Math.max(0, job.quality - coverage(g)) / 140;
       if (job.tier === "sterile" && !itemOn(g, "isolatore")) fail += 0.1;
       if (job.tier === "sterile" && !hasGear(g, "micro")) fail += 0.06;
@@ -1759,6 +1829,7 @@ function produce(g: Game) {
       fail = clamp(fail, 0.02, 0.45);
       if (roll(g.week * 17 + job.done + g.seq) < fail) {
         job.scrap += 1;
+        job.step = "reazione";
         learnProcess(g, job, false);
         g.quality = clamp(g.quality - 2, 0, 100);
         g.reputation = clamp(g.reputation - 2, 0, 100);
@@ -1773,6 +1844,7 @@ function produce(g: Game) {
         } else pushLog(g, `Lotto ${job.client} fuori specifica.`, "bad");
       } else {
         job.done += 1;
+        job.step = "reazione";
         learnProcess(g, job, true);
         g.stats.batches += 1;
         let slice = Math.round(job.pay / job.batches);
@@ -2374,12 +2446,84 @@ export function tick(g: Game) {
   return next;
 }
 
-export function waitingProgram(g: Game) {
-  return g.pipeline.find((p) => p.waiting && !["failed", "launched", "licensed"].includes(p.stage)) ?? null;
+export const LESSONS: { title: string; text: string }[] = [
+  { title: "Il campus", text: "Tocca una casella vuota. Prima il corridoio: porta la corrente. Poi la stanza, da quell'angolo verso est e verso sud." },
+  { title: "Dentro la stanza", text: "Il guscio da solo non lavora. Nel pilota servono reattore e un operatore. Il lotto passa poi dal filtro e dal rilascio: senza un analista nel QC resta in quarantena." },
+  { title: "I contratti", text: "Si firmano nell'altra linguetta. Se la linea non è pronta, la data scade lo stesso. Un lotto pulito insegna il processo di quella casa." },
+  { title: "Scienza e tecniche", text: "Gli scienziati in panchina fanno scienza. Ogni tecnica dice cosa apre. Se la approfondisci, il rigo sotto dice il numero che cambia." },
+  { title: "Le persone", text: "Il tratto conta: preciso fa meno scarti, svelto accelera, curioso fa scienza. Senza un analista nel QC, la qualità scende." },
+];
+
+export function advanceLesson(g: Game) {
+  const next = structuredClone(g) as Game;
+  heal(next);
+  next.lesson = Math.min(LESSONS.length, (next.lesson ?? 0) + 1);
+  return next;
+}
+
+export function skipLesson(g: Game) {
+  const next = structuredClone(g) as Game;
+  heal(next);
+  next.lesson = LESSONS.length;
+  return next;
+}
+
+export function gearNote(id: string) {
+  const notes: Record<string, string> = {
+    scaffale: "Ogni livello tiene più materiale. Sale anche col livello della stanza.",
+    reattore: "Livello 1: solo lotti pilota. 2: contratti standard. 3: più svelto.",
+    "reattore-gmp": "Ogni livello alza la velocità. Al 2, con l'HPLC, arrivano i lotti di scala.",
+    bioreattore: "Ogni livello alza la velocità. Senza isolatore la suite va a metà.",
+    hplc: "Ogni livello alza la copertura di 7. I lotti difficili scartano meno.",
+    micro: "Copre i lotti sterili. Chiede la stanza allargata.",
+    blister: "Ogni livello fa pagare i lotti il 5% in più.",
+    astuccio: "I lotti incassano un altro 6%.",
+    lcms: "Senza, il lab non fa scienza. Ogni livello ne fa di più.",
+    saggi: "Fa correre la preclinica. Ogni livello un po' di più.",
+    "monitor-1": "Ogni livello accelera la fase I.",
+    "monitor-2": "Ogni livello accelera la fase II.",
+    dossier: "Dal livello 2 l'autorità legge due settimane in meno.",
+    trasformatore: "Ogni livello dà 10 kW. Di più se la centralina è alta.",
+    generatore: "Ogni livello dà 8 kW.",
+    freezer: "Ogni livello tiene più flaconi.",
+    filtro: "L'impianto va il 12% più svelto.",
+    "filtro-pilota": "Il pilota va l'8% più svelto.",
+    riempimento: "L'impianto va il 15% più svelto, e non perde il 10% sull'incasso.",
+    isolatore: "Senza, la suite è lenta e scarta di più.",
+    pw: "Senza il PW la suite non parte.",
+    wfi: "La suite va il 10% più svelta.",
+    cip: "Sull'impianto, meno scarti.",
+    armadietti: "Senza, impianto e suite non partono.",
+    sala: "Con un commerciale in direzione le buste pagano di più, e sono quattro.",
+    climatica: "Apre i contratti di scala e gli dà due settimane in più.",
+    banco: "Senza il banco non parte nessuna molecola.",
+    sintetizzatore: "Il lead corre il 20% più svelto.",
+    pharmacy: "Senza, non si entra in clinica.",
+    letti: "Insieme alla pharmacy fanno partire la fase I.",
+    unitdose: "Senza, la fase II non parte.",
+    tmf: "Senza, la fase III non parte.",
+    "brevetti-desk": "Depositare il brevetto costa il 25% in meno.",
+    gabbia: "Alza la copertura. Senza, il QC è più cieco.",
+    baia: "Il farmaco tuo vende di più. Senza, incassa il 25% in meno.",
+    serial: "Serve per la FDA, e l'incasso non perde il 10%.",
+  };
+  return notes[id] ?? "Se non ha corrente, non conta.";
+}
+
+export function roomLevelNote(type: RoomType) {
+  if (type === "pilot" || type === "plant" || type === "sterile") return "Ogni livello rende la linea circa il 6% più svelta. Il mantenimento sale. Al 3 entra un posto in più.";
+  if (type === "warehouse") return "Gli scaffali tengono di più. Il mantenimento sale. Al 3 entra un posto in più.";
+  if (type === "power") return "Il trasformatore rende di più. Al 3 entra un posto in più.";
+  if (type === "cold") return "I freezer tengono più flaconi. Al 3 entra un posto in più.";
+  return "Il mantenimento sale. Al livello 3 entra un posto in più. Le macchine si comprano a parte.";
 }
 
 export type BriefTab = "map" | "deals" | "research" | "tech" | "team" | "world";
 export type Brief = { text: string; tab: BriefTab };
+
+export function waitingProgram(g: Game) {
+  return g.pipeline.find((p) => p.waiting && !["failed", "launched", "licensed"].includes(p.stage)) ?? null;
+}
 
 export function briefOf(g: Game): Brief[] {
   const out: Brief[] = [];
@@ -2388,6 +2532,8 @@ export function briefOf(g: Game): Brief[] {
   };
   const waiting = waitingProgram(g);
   if (waiting) push(`${waiting.code} aspetta una decisione.`, "research");
+  const held = g.jobs.find((job) => job.status === "active" && (job.step ?? "reazione") === "rilascio" && !releaseReady(g));
+  if (held) push(`${held.client} è in quarantena.`, "deals");
   const late = g.jobs.find((job) => g.week > (job.due ?? g.week));
   if (late) push(`${late.client} è in ritardo.`, "deals");
   const power = powerReport(g);
