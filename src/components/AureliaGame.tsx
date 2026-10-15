@@ -266,7 +266,7 @@ export function AureliaGame() {
     return (
       <div className="safe-top safe-bot h-dvh overflow-y-auto bg-paper text-ink">
         <div className="mx-auto flex min-h-full max-w-lg flex-col justify-center gap-6 px-5 py-8">
-          <div>
+          <div className="sheet rounded-3xl px-5 py-6">
             <p className="text-sm font-semibold uppercase tracking-widest text-teal">CDMO</p>
             <h1 className="font-display text-5xl leading-none">Aurelia</h1>
             <p className="mt-3 text-base leading-relaxed text-mist">
@@ -293,18 +293,17 @@ export function AureliaGame() {
 
   return (
     <div className="flex h-dvh flex-col bg-paper text-ink">
-      <header className="safe-top z-20 flex items-center gap-2 border-b border-line bg-card px-3 pb-2">
+      <header className="hud safe-top z-20 flex items-end gap-2 px-3 pb-2">
         <div className="min-w-0 flex-1">
-          <p className="truncate font-display text-xl leading-none">{game.name}</p>
-          <p className="text-sm text-mist">
-            {game.chapter} · anno {yearOf(game.week)}
-          </p>
+          <p className="text-[10px] font-semibold tracking-[0.16em] text-teal uppercase">{game.chapter}</p>
+          <p className="truncate font-display text-2xl leading-none">{game.name}</p>
+          <p className="text-xs text-mist">anno {yearOf(game.week)}</p>
         </div>
-        <div className="text-right">
+        <div className="cash px-3 py-1.5 text-right">
           <p className="font-display text-lg leading-none">{euro(game.cash)}</p>
-          <p className="text-sm text-mist">sett. {game.week}</p>
+          <p className="text-[10px] text-foam/70">sett. {game.week}</p>
         </div>
-        <button type="button" aria-label="Avanza di una settimana" onClick={() => apply(tick(game))} className="grid h-11 w-11 place-items-center rounded-full bg-amber text-ink">
+        <button type="button" aria-label="Avanza di una settimana" onClick={() => apply(tick(game))} className="grid h-11 w-11 place-items-center rounded-full bg-amber text-ink shadow-sm">
           <Plus />
         </button>
         <button
@@ -314,18 +313,16 @@ export function AureliaGame() {
             unlockAudio();
             setPlaying((v) => !v);
           }}
-          className="grid h-11 w-11 place-items-center rounded-full bg-ink text-card"
+          className="grid h-11 w-11 place-items-center rounded-full bg-ink text-card shadow-sm"
         >
           {playing ? <Pause /> : <Play />}
         </button>
       </header>
-      <div className="grid grid-cols-4 gap-1 border-b border-line bg-card px-2 py-1 text-center text-[11px] text-mist">
-        <span>API {game.api}/{capOf(game, "api")}</span>
-        <span>Sol {game.solvent}</span>
-        <span>Sci {Math.floor(game.science)}</span>
-        <span>
-          kW {power?.demand}/{power?.supply}
-        </span>
+      <div className="grid grid-cols-4 gap-1.5 border-b border-line bg-paper/80 px-2 py-1.5">
+        <span className="meter"><i className="bg-teal" />API {game.api}/{capOf(game, "api")}</span>
+        <span className="meter"><i className="bg-amber" />Sol {game.solvent}</span>
+        <button type="button" className="meter" onClick={() => setToast(scienceHint(game))}><i className="bg-ink" />Sci {Math.floor(game.science)}</button>
+        <span className="meter"><i className="bg-mist" />kW {power?.demand}/{power?.supply}</span>
       </div>
 
       <main className="relative min-h-0 flex-1">
@@ -360,7 +357,7 @@ export function AureliaGame() {
         )}
 
         {tab === "map" && !room && !cell && goal ? (
-          <div className="pointer-events-none absolute bottom-3 left-3 right-16 truncate rounded-full bg-card/95 px-3 py-2 text-sm shadow-sm">
+          <div className="pointer-events-none absolute bottom-3 left-3 right-16 truncate rounded-full border border-white/70 bg-card/90 px-3 py-2 text-sm shadow-md backdrop-blur">
             <span className="text-mist">Ora · </span>
             {goal.label}
           </div>
@@ -368,20 +365,21 @@ export function AureliaGame() {
 
         {tab === "map" ? (
           <div className="absolute right-3 bottom-3 flex flex-col gap-2">
-            <button type="button" aria-label="Avvicina" className="grid h-11 w-11 place-items-center rounded-full bg-card shadow-sm" onClick={() => zoomBy(cam.current, canvasRef.current, game, 1.12)}>
+            <button type="button" aria-label="Avvicina" className="grid h-11 w-11 place-items-center rounded-full border border-line bg-card shadow-md" onClick={() => zoomBy(cam.current, canvasRef.current, game, 1.12)}>
               <Plus />
             </button>
-            <button type="button" aria-label="Allontana" className="grid h-11 w-11 place-items-center rounded-full bg-card shadow-sm" onClick={() => zoomBy(cam.current, canvasRef.current, game, 0.88)}>
+            <button type="button" aria-label="Allontana" className="grid h-11 w-11 place-items-center rounded-full border border-line bg-card shadow-md" onClick={() => zoomBy(cam.current, canvasRef.current, game, 0.88)}>
               <Minus />
             </button>
           </div>
         ) : null}
 
-        {toast ? <p className="absolute top-3 right-3 left-3 z-40 rounded-xl bg-ink px-3 py-2 text-sm text-card">{toast}</p> : null}
+        {toast ? <p className="absolute top-3 right-3 left-3 z-40 rounded-2xl bg-ink px-3 py-2 text-sm text-card shadow-lg">{toast}</p> : null}
         {waiting && playing ? <p className="absolute top-16 right-16 left-3 rounded-xl bg-amber px-3 py-2 text-sm text-ink">{waiting.code} aspetta una decisione. Pausa.</p> : null}
 
         {tab === "map" && cell ? (
           <BuildSheet
+            key={`${cell.c}-${cell.r}`}
             game={game}
             c={cell.c}
             r={cell.r}
@@ -401,7 +399,7 @@ export function AureliaGame() {
         ) : null}
       </main>
 
-      <nav className="safe-bot z-20 grid grid-cols-6 border-t border-line bg-card">
+      <nav className="dock safe-bot z-20">
         <Nav icon={<MapIcon />} label="Mappa" on={tab === "map"} click={() => setTab("map")} />
         <Nav icon={<ScrollText />} label="Contratti" on={tab === "deals"} click={() => setTab("deals")} dot={game.offers.length > 0} />
         <Nav icon={<FlaskConical />} label="Ricerca" on={tab === "research"} click={() => setTab("research")} dot={game.pipeline.some((item) => item.waiting)} />
@@ -422,7 +420,7 @@ function zoomBy(cam: Cam, canvas: HTMLCanvasElement | null, game: Game, factor: 
 
 function Nav({ icon, label, on, click, dot }: { icon: ReactNode; label: string; on: boolean; click: () => void; dot?: boolean }) {
   return (
-    <button type="button" onClick={click} className={`flex min-h-14 flex-col items-center justify-center gap-0.5 text-[10px] leading-none ${on ? "text-teal" : "text-mist"}`}>
+    <button type="button" onClick={click} className={`mx-0.5 my-1 flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-2xl text-[10px] leading-none ${on ? "bg-teal/10 text-teal" : "text-mist"}`}>
       <span className="relative [&_svg]:h-5 [&_svg]:w-5">
         {icon}
         {dot ? <span className="absolute -top-0.5 -right-1.5 h-2 w-2 rounded-full bg-amber" /> : null}
@@ -441,7 +439,8 @@ function FocusCard({ title, text, on, click }: { title: string; text: string; on
 }
 function Sheet({ title, onClose, children, back }: { title: string; onClose: () => void; children: ReactNode; back?: boolean }) {
   return (
-    <section className="absolute inset-x-0 bottom-0 z-30 max-h-[72%] overflow-y-auto rounded-t-3xl border border-line bg-card px-4 pt-3 pb-4 shadow-md">
+    <section className="sheet absolute inset-x-0 bottom-0 z-30 max-h-[72%] overflow-y-auto rounded-t-3xl px-4 pt-2 pb-4">
+      <div className="mx-auto mb-2 h-1.5 w-10 rounded-full bg-line" />
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="font-display text-2xl">{title}</h2>
         <button type="button" aria-label={back ? "Chiudi scheda" : "Chiudi"} onClick={onClose} className="grid h-11 w-11 place-items-center rounded-full bg-paper">
@@ -453,9 +452,17 @@ function Sheet({ title, onClose, children, back }: { title: string; onClose: () 
   );
 }
 
+function scienceHint(game: Game) {
+  const rate = scienceRate(game);
+  const pace = rate.toFixed(1).replace(".", ",");
+  if (rate > 0) return `Scienza circa ${pace} a settimana. La fanno gli scienziati in panchina, o nel lab di scoperta se l'LC-MS è acceso. I contratti «Processo» ne lasciano altra a fine lavoro.`;
+  return "Nessuno produce scienza. Lascia uno scienziato in panchina, oppure mettilo nel lab di scoperta con l'LC-MS acceso.";
+}
+
 function BuildSheet({ game, c, r, apply, close, bought }: { game: Game; c: number; r: number; apply: (g: Game | string) => void; close: () => void; bought: () => void }) {
   const parcel = parcelAt(c, r);
   const tile = game.tiles[r]![c]!;
+  const [want, setWant] = useState<"path" | "room" | null>(tile?.corridor ? "path" : null);
   if (!parcel) return null;
   if (!game.owned.includes(parcel.id)) {
     return (
@@ -477,51 +484,70 @@ function BuildSheet({ game, c, r, apply, close, bought }: { game: Game; c: numbe
     );
   }
   const options = ROOMS.filter((def) => def.type !== "hq" && def.parcels.includes(parcel.id));
+  const pathBlock = canCorridor(game, c, r);
   return (
-    <Sheet title={tile.corridor ? "Corridoio" : "Costruisci"} onClose={close}>
-      <p className="mb-2 text-sm text-mist">
-        Lotto {parcel.name}. Per una stanza tocca l'angolo nord-ovest: la stanza cresce verso est e verso sud.
-      </p>
-      {tile.corridor ? (
-        <button type="button" className="mb-2 min-h-11 w-full rounded-full bg-paper" onClick={() => { apply(removeCorridor(game, c, r)); close(); }}>
-          Togli corridoio · rimborso 4 mila €
+    <Sheet title={tile.corridor ? "Corridoio" : "Casella vuota"} onClose={close}>
+      <p className="text-sm text-mist">Lotto {parcel.name}. Il tocco non costruisce da solo: scegli sotto.</p>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <button type="button" className={`min-h-16 rounded-xl px-3 text-left ${want === "path" ? "bg-ink text-card" : "bg-paper"}`} onClick={() => setWant("path")}>
+          <span className="block font-medium">Corridoio</span>
+          <span className="block text-sm opacity-80">Collega le stanze</span>
         </button>
-      ) : (
-        <button
-          type="button"
-          className="mb-2 min-h-11 w-full rounded-full bg-ink text-card"
-          onClick={() => {
-            const result = placeCorridor(game, c, r);
-            apply(result);
-            if (typeof result !== "string") close();
-          }}
-        >
-          Corridoio · 8 mila €{canCorridor(game, c, r) ? ` · ${canCorridor(game, c, r)}` : ""}
+        <button type="button" className={`min-h-16 rounded-xl px-3 text-left ${want === "room" ? "bg-ink text-card" : "bg-paper"}`} onClick={() => setWant("room")}>
+          <span className="block font-medium">Stanza</span>
+          <span className="block text-sm opacity-80">Da questo angolo</span>
         </button>
-      )}
-      <div className="grid gap-2">
-        {options.map((def) => {
-          const block = canPlace(game, def.type as RoomType, c, r);
-          return (
+      </div>
+      {want === "path" ? (
+        tile.corridor ? (
+          <button type="button" className="mt-3 min-h-12 w-full rounded-full bg-paper" onClick={() => { apply(removeCorridor(game, c, r)); close(); }}>
+            Togli il corridoio · tornano 4 mila €
+          </button>
+        ) : (
+          <>
+            {pathBlock ? <p className="mt-3 text-sm text-amber">{pathBlock}</p> : <p className="mt-3 text-sm text-mist">Una striscia. Senza, la stanza non ha corrente.</p>}
             <button
-              key={def.type}
               type="button"
-              className="min-h-14 rounded-xl border border-line bg-paper px-3 text-left"
+              className="mt-2 min-h-12 w-full rounded-full bg-teal font-semibold text-card"
               onClick={() => {
-                const result = placeRoom(game, def.type, c, r);
+                const result = placeCorridor(game, c, r);
                 apply(result);
                 if (typeof result !== "string") close();
               }}
             >
-              <span className="block font-medium">
-                {def.name} · {def.w}×{def.h}
-              </span>
-              <span className="block text-sm text-mist">{block ?? def.blurb}</span>
-              <span className="font-display text-amber">{euro(def.shell)}</span>
+              Posa il corridoio · 8 mila €
             </button>
-          );
-        })}
-      </div>
+          </>
+        )
+      ) : null}
+      {want === "room" ? (
+        tile.corridor ? (
+          <p className="mt-3 text-sm text-amber">Qui c'è un corridoio. Toglilo prima, se vuoi una stanza.</p>
+        ) : (
+          <div className="mt-3 grid gap-2">
+            <p className="text-sm text-mist">La stanza parte da questa casella e cresce verso est e verso sud.</p>
+            {options.map((def) => {
+              const block = canPlace(game, def.type as RoomType, c, r);
+              return (
+                <button
+                  key={def.type}
+                  type="button"
+                  className="min-h-14 rounded-xl border border-line bg-paper px-3 text-left"
+                  onClick={() => {
+                    const result = placeRoom(game, def.type, c, r);
+                    apply(result);
+                    if (typeof result !== "string") close();
+                  }}
+                >
+                  <span className="block font-medium">{def.name} · {def.w}×{def.h}</span>
+                  <span className="block text-sm text-mist">{block ?? def.blurb}</span>
+                  <span className="font-display text-amber">{euro(def.shell)}</span>
+                </button>
+              );
+            })}
+          </div>
+        )
+      ) : null}
     </Sheet>
   );
 }

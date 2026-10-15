@@ -580,18 +580,57 @@ function drawTree(ctx: CanvasRenderingContext2D, x: number, y: number, s: number
   ctx.fill();
 }
 
+function drawSky(ctx: CanvasRenderingContext2D, viewW: number, viewH: number, t: number) {
+  const sky = ctx.createLinearGradient(0, 0, 0, viewH);
+  sky.addColorStop(0, "#8eb8b4");
+  sky.addColorStop(0.38, "#d3e6df");
+  sky.addColorStop(1, "#e8f2ec");
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, viewW, viewH);
+  const sun = ctx.createRadialGradient(viewW * 0.78, viewH * 0.08, 4, viewW * 0.78, viewH * 0.1, Math.max(120, viewW * 0.42));
+  sun.addColorStop(0, "rgba(255, 214, 140, 0.85)");
+  sun.addColorStop(0.45, "rgba(255, 214, 140, 0.18)");
+  sun.addColorStop(1, "rgba(255, 214, 140, 0)");
+  ctx.fillStyle = sun;
+  ctx.fillRect(0, 0, viewW, viewH);
+  ctx.fillStyle = "rgba(255,255,255,0.62)";
+  for (let i = 0; i < 3; i++) {
+    const x = ((t * 6 + i * 220) % (viewW + 180)) - 90;
+    const y = 22 + i * 18;
+    ctx.beginPath();
+    ctx.ellipse(x, y, 34, 11, 0, 0, Math.PI * 2);
+    ctx.ellipse(x + 24, y + 3, 22, 9, 0, 0, Math.PI * 2);
+    ctx.ellipse(x - 20, y + 4, 16, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawVignette(ctx: CanvasRenderingContext2D, viewW: number, viewH: number) {
+  const vignette = ctx.createRadialGradient(viewW / 2, viewH * 0.42, Math.min(viewW, viewH) * 0.25, viewW / 2, viewH * 0.5, Math.max(viewW, viewH) * 0.72);
+  vignette.addColorStop(0, "rgba(18,38,44,0)");
+  vignette.addColorStop(1, "rgba(18,38,44,0.16)");
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, viewW, viewH);
+}
+
 function drawGround(ctx: CanvasRenderingContext2D, game: Game, c: number, r: number, m: Metrics, owned: boolean, selected: boolean) {
   const tile = game.tiles[r]![c]!;
   const { x, y } = tilePos(c, r, m);
   const garden = tile.ground === "garden";
   const n = hash(c, r);
-  let fill = garden ? (n > 0.5 ? "#8fbfa6" : "#7eb396") : n > 0.5 ? "#c5e0d2" : "#b7d4c4";
-  if (!owned) fill = "#d7dfdb";
+  let fill = garden ? (n > 0.55 ? "#6fa888" : "#5f987c") : owned ? (n > 0.62 ? "#c5ddd0" : "#b7d2c4") : n > 0.5 ? "#d5ddd9" : "#c8d2cd";
   diamond(ctx, x, y, m.TW / 2, m.TH / 2);
   ctx.fillStyle = fill;
   ctx.fill();
-  ctx.strokeStyle = owned ? "rgba(18,38,44,0.07)" : "rgba(18,38,44,0.05)";
+  if (owned && !garden) {
+    diamond(ctx, x, y, m.TW / 2 - 4 * m.zoom, m.TH / 2 - 2.4 * m.zoom);
+    ctx.strokeStyle = "rgba(255,255,255,0.45)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+  ctx.strokeStyle = owned ? "rgba(18,38,44,0.08)" : "rgba(18,38,44,0.04)";
   ctx.lineWidth = 1;
+  diamond(ctx, x, y, m.TW / 2, m.TH / 2);
   ctx.stroke();
   if (owned && !garden && n > 0.84) {
     ctx.strokeStyle = "rgba(20,90,70,0.22)";
@@ -684,6 +723,9 @@ function drawRoom(ctx: CanvasRenderingContext2D, game: Game, room: Room, m: Metr
     diamond(ctx, x, y, m.TW / 2, m.TH / 2);
     ctx.fillStyle = grad;
     ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.4)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
     motif(ctx, x, y, m, look, tile.c, tile.r);
     if (!online) {
       ctx.save();
@@ -820,11 +862,7 @@ function drawParcelSigns(ctx: CanvasRenderingContext2D, game: Game, m: Metrics, 
 export function drawCampus(ctx: CanvasRenderingContext2D, game: Game, viewW: number, viewH: number, cam: Cam, t: number, selected: { c: number; r: number } | null) {
   signs.length = 0;
   ctx.clearRect(0, 0, viewW, viewH);
-  const sky = ctx.createLinearGradient(0, 0, 0, viewH);
-  sky.addColorStop(0, "#d5e4dc");
-  sky.addColorStop(1, "#e8f1ec");
-  ctx.fillStyle = sky;
-  ctx.fillRect(0, 0, viewW, viewH);
+  drawSky(ctx, viewW, viewH, t);
 
   const bounds = cameraBounds(game);
   const m = metrics(viewW, viewH, cam, bounds);
@@ -875,4 +913,5 @@ export function drawCampus(ctx: CanvasRenderingContext2D, game: Game, viewW: num
     }
   }
   drawParcelSigns(ctx, game, m, viewW, viewH);
+  drawVignette(ctx, viewW, viewH);
 }
