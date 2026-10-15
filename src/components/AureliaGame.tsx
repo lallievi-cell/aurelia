@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, FlaskConical, GitBranch, Globe2, Map as MapIcon, Minus, Pause, Play, Plus, ScrollText, Users, X } from "lucide-react";
 import { blip, unlockAudio } from "@/tycoon/audio";
-import { drawCampus, fitZoom, pickSign, pickTile, cameraBounds, type Cam } from "@/tycoon/draw";
+import { drawCampus, fitZoom, loadCampusArt, pickSign, pickTile, cameraBounds, type Cam } from "@/tycoon/draw";
 import {
   AUTHORITIES,
   BRANCH_LABEL,
@@ -146,6 +146,7 @@ export function AureliaGame() {
   playRef.current = playing;
 
   useEffect(() => {
+    loadCampusArt();
     const saved = loadGame();
     if (saved) setGame(saved);
     setBooted(true);
@@ -297,6 +298,7 @@ export function AureliaGame() {
   return (
     <div className="flex h-dvh flex-col bg-paper text-ink">
       <header className="hud safe-top z-20 flex items-end gap-2 px-3 pb-2">
+        <img src={`${import.meta.env.BASE_URL}aurelia/crest.png`} alt="" className="mb-0.5 h-11 w-11 shrink-0 rounded-full shadow-md" />
         <div className="min-w-0 flex-1">
           <p className="text-[10px] font-semibold tracking-[0.16em] text-teal uppercase">{game.chapter}</p>
           <p className="truncate font-display text-2xl leading-none">{game.name}</p>

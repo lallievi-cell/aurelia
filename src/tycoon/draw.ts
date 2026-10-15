@@ -66,7 +66,48 @@ const NAME: Record<RoomType, string> = {
   water: "Acque",
 };
 
+const ART_OF: Partial<Record<RoomType, string>> = {
+  hq: "hq",
+  gown: "qc",
+  warehouse: "warehouse",
+  quarantine: "warehouse",
+  cold: "cold",
+  shipping: "shipping",
+  pilot: "pilot",
+  plant: "plant",
+  pack: "shipping",
+  sterile: "sterile",
+  qc: "qc",
+  stability: "cold",
+  discovery: "discovery",
+  preclinical: "discovery",
+  phase1: "clinic",
+  phase23: "clinic",
+  regulatory: "regulatory",
+  power: "power",
+  water: "water",
+};
+
+const artImages = new Map<string, HTMLImageElement>();
 const signs: Sign[] = [];
+
+export function loadCampusArt() {
+  if (artImages.size || typeof Image === "undefined") return;
+  const base = import.meta.env.BASE_URL;
+  for (const file of new Set([...Object.values(ART_OF), "tree"])) {
+    const img = new Image();
+    img.decoding = "async";
+    img.src = `${base}aurelia/${file}.png`;
+    artImages.set(file, img);
+  }
+}
+
+function campusArt(id: string | undefined) {
+  if (!id) return null;
+  const img = artImages.get(id);
+  if (!img || !img.complete || img.naturalWidth === 0) return null;
+  return img;
+}
 
 export function pickSign(px: number, py: number) {
   const hit = signs.find((s) => px >= s.x && py >= s.y && px <= s.x + s.w && py <= s.y + s.h);
@@ -702,7 +743,64 @@ function drawCorridor(ctx: CanvasRenderingContext2D, game: Game, c: number, r: n
   ctx.stroke();
 }
 
+function drawArtRoom(ctx: CanvasRenderingContext2D, game: Game, room: Room, m: Metrics, selected: boolean, t: number): Tag | null {
+  const img = campusArt(ART_OF[room.type]);
+  if (!img) return null;
+  const tiles = roomTiles(room);
+  const s = m.zoom;
+  const online = roomOnline(game, room);
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const tile of tiles) {
+    const pos = tilePos(tile.c, tile.r, m);
+    const k = corners(pos.x, pos.y, m);
+    minX = Math.min(minX, k.w.x);
+    maxX = Math.max(maxX, k.e.x);
+    maxY = Math.max(maxY, k.s.y);
+    diamond(ctx, pos.x + 2 * s, pos.y + 5 * s, m.TW / 2, m.TH / 2);
+    ctx.fillStyle = "rgba(18,38,44,0.16)";
+    ctx.fill();
+  }
+  const fw = Math.max(m.TW, maxX - minX);
+  const cx = (minX + maxX) / 2;
+  const sw = fw * (room.w + room.h > 3 ? 0.92 : 1.08);
+  const sh = sw * (img.height / img.width);
+  ctx.save();
+  ctx.translate(cx, maxY - m.TH * 0.2);
+  ctx.scale(1, 0.42);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, fw * 0.46, fw * 0.46, 0, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(18,38,44,0.2)";
+  ctx.fill();
+  ctx.restore();
+  ctx.save();
+  if (!online || room.halt > 0) ctx.filter = "saturate(0.15) brightness(0.82)";
+  if (selected) {
+    ctx.shadowColor = "rgba(200,136,18,0.9)";
+    ctx.shadowBlur = 16 * s;
+  }
+  ctx.drawImage(img, cx - sw / 2, maxY - sh * 0.86, sw, sh);
+  ctx.restore();
+  const crew = game.staff.filter((member) => member.roomId === room.id).slice(0, 3);
+  crew.forEach((member, index) => {
+    const ox = (index - (crew.length - 1) / 2) * 16 * s;
+    person(ctx, cx + ox, maxY - 2 * s, s * 0.85, coatOf(member.role), t, index);
+  });
+  const gearCount = room.slots.filter((slot) => slot.item).length;
+  const state: TagState = !online ? "off" : room.halt > 0 ? "halt" : gearCount === 0 ? "empty" : "ok";
+  const title = room.type === "hq" ? game.name : NAME[room.type];
+  const font = Math.round(Math.min(15, Math.max(12, 13 * s)));
+  ctx.font = `600 ${font}px Outfit, Trebuchet MS, sans-serif`;
+  const note = state === "off" ? "staccata" : state === "halt" ? "ferma" : state === "empty" ? "vuota" : "";
+  const text = note ? `${title} · ${note}` : title;
+  const w = Math.max(68, ctx.measureText(text).width + 36);
+  return { x: cx, y: maxY + 4 * s, w, title, level: room.level, s, state, selected };
+}
+
 function drawRoom(ctx: CanvasRenderingContext2D, game: Game, room: Room, m: Metrics, selected: boolean, t: number, off: { roomId: string; index: number }[]): Tag {
+  const painted = drawArtRoom(ctx, game, room, m, selected, t);
+  if (painted) return painted;
   const look = LOOK[room.type];
   const tiles = roomTiles(room);
   const s = m.zoom;
@@ -885,7 +983,33 @@ export function drawCampus(ctx: CanvasRenderingContext2D, game: Game, viewW: num
   }
 
   const rooms = [...game.rooms].sort((a, b) => a.c + a.r + a.w + a.h - (b.c + b.r + b.w + b.h));
-  const tags = rooms.map((room) => drawRoom(ctx, game, room, m, selectedRoom === room.id, t, power.off));
+  const tree = campusArt("tree");
+  const stamps: { z: number; paint: () => Tag | void }[] = rooms.map((room) => ({
+    z: room.c + room.r + room.w + room.h,
+    paint: () => drawRoom(ctx, game, room, m, selectedRoom === room.id, t, power.off),
+  }));
+  if (tree) {
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const tile = game.tiles[r]?.[c];
+        if (!tile || tile.roomId || tile.corridor) continue;
+        if ((c * 5 + r * 3) % 7 !== 0) continue;
+        const parcel = PARCELS.find((p) => c >= p.c0 && c < p.c1 && r >= p.r0 && r < p.r1);
+        if (!parcel || !game.owned.includes(parcel.id)) continue;
+        stamps.push({
+          z: c + r + 1,
+          paint: () => {
+            const pos = tilePos(c, r, m);
+            const sw = m.TW * 0.72;
+            const sh = sw * (tree.height / tree.width);
+            ctx.drawImage(tree, pos.x - sw / 2, pos.y - sh * 0.78, sw, sh);
+          },
+        });
+      }
+    }
+  }
+  stamps.sort((a, b) => a.z - b.z);
+  const tags = stamps.map((stamp) => stamp.paint()).filter((tag): tag is Tag => !!tag);
   placeTags(ctx, tags);
 
   const seen = new Set<string>();
