@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, Box, Building2, Droplets, FastForward, FlaskConical, GitBranch, Globe2, Landmark, Map as MapIcon, Minus, Move, PackageCheck, Pause, Play, Plus, Radio, ScrollText, Users, X, Zap } from "lucide-react";
+import { ArrowLeft, Box, Building2, ChevronDown, ChevronUp, Droplets, FastForward, FlaskConical, GitBranch, Globe2, Landmark, Map as MapIcon, Minus, Move, PackageCheck, Pause, Play, Plus, Radio, ScrollText, Users, X, Zap } from "lucide-react";
 import { blip, unlockAudio, soundClick, soundCash, soundSuccess, soundLevelUp } from "@/tycoon/audio";
 import { Campus3D } from "@/components/Campus3D";
 import { drawCampus, fitZoom, loadCampusArt, pickSign, pickTile, cameraBounds, type Cam } from "@/tycoon/draw";
@@ -189,6 +189,10 @@ export function AureliaGame() {
         setSpeed(2);
       } else if (e.key === "3" || e.key === "4") {
         setSpeed(4);
+      } else if (e.key === "Escape") {
+        setRoomId(null);
+        setCell(null);
+        setMovingRoomId(null);
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -568,6 +572,7 @@ export function AureliaGame() {
               selectedRoomId={roomId}
               selectedCell={cell}
               movingRoomId={movingRoomId}
+              inspectorOpen={Boolean(roomId || cell)}
               onSelectRoom={(id) => {
                 if (movingRoomId) return;
                 setRoomId(id);
@@ -757,7 +762,12 @@ export function AureliaGame() {
           />
         ) : null}
         {tab === "map" && room ? (
-          <Sheet title={roomDef(room.type).name} onClose={() => setRoomId(null)} back>
+          <Sheet
+            title={roomDef(room.type).name}
+            subtitle={`${room.w}×${room.h} · Livello ${room.level} · ${roomOnline(game, room) ? "Alimentata" : "Senza corrente"}`}
+            onClose={() => setRoomId(null)}
+            back
+          >
             <RoomPanel
               game={game}
               id={room.id}
@@ -833,17 +843,68 @@ function FocusCard({ title, text, on, click }: { title: string; text: string; on
     </button>
   );
 }
-function Sheet({ title, onClose, children, back }: { title: string; onClose: () => void; children: ReactNode; back?: boolean }) {
+function Sheet({
+  title,
+  onClose,
+  children,
+  back,
+  subtitle,
+}: {
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+  back?: boolean;
+  subtitle?: string;
+}) {
+  const [collapsed, setCollapsed] = useState(false);
+
   return (
-    <section className="sheet absolute inset-x-0 bottom-0 z-30 max-h-[72%] overflow-y-auto rounded-t-3xl px-4 pt-2 pb-4">
-      <div className="mx-auto mb-2 h-1.5 w-10 rounded-full bg-line" />
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="font-display text-2xl">{title}</h2>
-        <button type="button" aria-label={back ? "Chiudi scheda" : "Chiudi"} onClick={onClose} className="grid h-11 w-11 place-items-center rounded-full bg-paper">
-          {back ? <ArrowLeft /> : <X />}
-        </button>
+    <section
+      className={`sheet absolute z-30 transition-all duration-300 ease-out flex flex-col ${
+        collapsed
+          ? "inset-x-0 bottom-0 md:inset-x-auto md:right-4 md:bottom-20 md:top-auto md:w-[410px] rounded-t-3xl md:rounded-3xl shadow-xl"
+          : "inset-x-0 bottom-0 max-h-[48vh] md:max-h-[calc(100%-8.5rem)] md:inset-x-auto md:right-4 md:top-14 md:bottom-20 md:w-[410px] rounded-t-3xl md:rounded-3xl shadow-2xl"
+      }`}
+    >
+      {/* Mobile drag bar */}
+      <div className="md:hidden mx-auto mt-2 h-1.5 w-10 rounded-full bg-line shrink-0" />
+
+      {/* Header */}
+      <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-line/60 bg-paper/95 backdrop-blur-md rounded-t-3xl md:rounded-t-3xl shrink-0">
+        <div className="min-w-0 flex-1">
+          <h2 className="font-display text-xl sm:text-2xl truncate text-ink leading-tight">{title}</h2>
+          {subtitle ? <p className="text-[11px] text-mist truncate mt-0.5">{subtitle}</p> : null}
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            aria-label={collapsed ? "Espandi scheda" : "Riduci scheda"}
+            title={collapsed ? "Espandi" : "Riduci a barra"}
+            onClick={() => setCollapsed((v) => !v)}
+            className="grid h-9 w-9 place-items-center rounded-full bg-paper hover:bg-card border border-line/70 text-mist hover:text-ink transition-all cursor-pointer active:scale-95 shadow-2xs"
+          >
+            {collapsed ? <ChevronUp className="h-4 w-4 text-teal" /> : <ChevronDown className="h-4 w-4" />}
+          </button>
+
+          <button
+            type="button"
+            aria-label={back ? "Chiudi scheda" : "Chiudi"}
+            title="Chiudi pannello (ESC)"
+            onClick={onClose}
+            className="grid h-9 w-9 place-items-center rounded-full bg-paper hover:bg-card border border-line/70 text-mist hover:text-ink transition-all cursor-pointer active:scale-95 shadow-2xs"
+          >
+            {back ? <ArrowLeft className="h-4 w-4" /> : <X className="h-4 w-4" />}
+          </button>
+        </div>
       </div>
-      {children}
+
+      {/* Scrollable Body */}
+      {!collapsed && (
+        <div className="flex-1 overflow-y-auto px-4 py-3 min-h-0 space-y-3">
+          {children}
+        </div>
+      )}
     </section>
   );
 }
@@ -862,7 +923,7 @@ function BuildSheet({ game, c, r, apply, close, bought }: { game: Game; c: numbe
   if (!parcel) return null;
   if (!game.owned.includes(parcel.id)) {
     return (
-      <Sheet title={parcel.name} onClose={close}>
+      <Sheet title={parcel.name} subtitle="Lotto di espansione" onClose={close}>
         <p className="text-sm text-mist">{parcel.tech ? `Tecnica: ${techDef(parcel.tech).name}. ` : ""}{parcel.needBatch ? "Serve un lotto già consegnato. " : ""}Costa {euro(parcel.cost)}.</p>
         <button
           type="button"
@@ -883,29 +944,54 @@ function BuildSheet({ game, c, r, apply, close, bought }: { game: Game; c: numbe
   const options = ROOMS.filter((def) => def.type !== "hq" && def.parcels.includes(parcel.id));
   const pathBlock = canCorridor(game, c, r);
   return (
-    <Sheet title={tile.corridor ? "Corridoio" : "Casella vuota"} onClose={close}>
-      <p className="text-sm text-mist">Lotto {parcel.name}. Il tocco non costruisce da solo: scegli sotto.</p>
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <button type="button" className={`min-h-16 rounded-xl px-3 text-left transition-all ${want === "path" ? "bg-ink text-card" : "bg-paper hover:bg-card"}`} onClick={() => { soundClick(); setWant("path"); }}>
-          <span className="block font-medium">Corridoio</span>
-          <span className="block text-sm opacity-80">Collega le stanze</span>
+    <Sheet
+      title={tile.corridor ? "Corridoio" : "Costruisci"}
+      subtitle={`Lotto ${parcel.name} · Casella (${c}, ${r})`}
+      onClose={close}
+    >
+      <p className="text-xs text-mist">Lotto {parcel.name}. Seleziona l'elemento da posare sulla casella:</p>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          className={`min-h-14 rounded-2xl px-3 py-2 text-left transition-all border cursor-pointer ${
+            want === "path"
+              ? "bg-ink text-card border-ink shadow-sm"
+              : "bg-paper hover:bg-card border-line/70 hover:border-teal text-ink"
+          }`}
+          onClick={() => { soundClick(); setWant("path"); }}
+        >
+          <span className="block font-semibold text-sm">Corridoio</span>
+          <span className="block text-xs opacity-75">Collega e alimenta</span>
         </button>
-        <button type="button" className={`min-h-16 rounded-xl px-3 text-left transition-all ${want === "room" ? "bg-ink text-card" : "bg-paper hover:bg-card"}`} onClick={() => { soundClick(); setWant("room"); }}>
-          <span className="block font-medium">Stanza</span>
-          <span className="block text-sm opacity-80">Da questo angolo</span>
+        <button
+          type="button"
+          className={`min-h-14 rounded-2xl px-3 py-2 text-left transition-all border cursor-pointer ${
+            want === "room"
+              ? "bg-ink text-card border-ink shadow-sm"
+              : "bg-paper hover:bg-card border-line/70 hover:border-teal text-ink"
+          }`}
+          onClick={() => { soundClick(); setWant("room"); }}
+        >
+          <span className="block font-semibold text-sm">Stanza</span>
+          <span className="block text-xs opacity-75">Laboratori e GMP</span>
         </button>
       </div>
+
       {want === "path" ? (
         tile.corridor ? (
-          <button type="button" className="mt-3 min-h-12 w-full rounded-full bg-paper hover:bg-line/40 text-sm transition-colors" onClick={() => { soundCash(); apply(removeCorridor(game, c, r)); close(); }}>
+          <button
+            type="button"
+            className="mt-3 min-h-11 w-full rounded-full bg-paper hover:bg-line/40 text-sm font-medium border border-line text-mist hover:text-red-500 transition-colors cursor-pointer"
+            onClick={() => { soundCash(); apply(removeCorridor(game, c, r)); close(); }}
+          >
             Togli il corridoio · tornano 4 mila €
           </button>
         ) : (
-          <>
-            {pathBlock ? <p className="mt-3 text-sm text-amber">{pathBlock}</p> : <p className="mt-3 text-sm text-mist">Una striscia. Senza, la stanza non ha corrente.</p>}
+          <div className="mt-3 space-y-2">
+            {pathBlock ? <p className="text-xs text-amber font-medium">{pathBlock}</p> : <p className="text-xs text-mist">Collega le cleanroom alla direzione per portare corrente.</p>}
             <button
               type="button"
-              className="mt-2 min-h-12 w-full rounded-full bg-teal font-semibold text-card hover:opacity-95 active:scale-95 transition-all shadow-xs"
+              className="min-h-11 w-full rounded-full bg-teal font-semibold text-card hover:opacity-95 active:scale-95 transition-all shadow-xs cursor-pointer"
               onClick={() => {
                 soundClick();
                 const result = placeCorridor(game, c, r);
@@ -915,35 +1001,53 @@ function BuildSheet({ game, c, r, apply, close, bought }: { game: Game; c: numbe
             >
               Posa il corridoio · 8 mila €
             </button>
-          </>
+          </div>
         )
       ) : null}
+
       {want === "room" ? (
         tile.corridor ? (
-          <p className="mt-3 text-sm text-amber">Qui c'è un corridoio. Toglilo prima, se vuoi una stanza.</p>
+          <p className="mt-3 text-xs text-amber font-medium">Qui c'è un corridoio. Toglilo prima di piazzare una stanza.</p>
         ) : (
-          <div className="mt-3 grid gap-2">
-            <p className="text-sm text-mist">La stanza parte da questa casella e cresce verso est e verso sud.</p>
-            {options.map((def) => {
-              const block = canPlace(game, def.type as RoomType, c, r);
-              return (
-                <button
-                  key={def.type}
-                  type="button"
-                  className="min-h-14 rounded-xl border border-line bg-paper px-3 text-left hover:border-teal transition-colors active:scale-[0.99]"
-                  onClick={() => {
-                    soundClick();
-                    const result = placeRoom(game, def.type, c, r);
-                    apply(result);
-                    if (typeof result !== "string") close();
-                  }}
-                >
-                  <span className="block font-medium">{def.name} · {def.w}×{def.h}</span>
-                  <span className="block text-sm text-mist">{block ?? def.blurb}</span>
-                  <span className="font-display text-amber">{euro(def.shell)}</span>
-                </button>
-              );
-            })}
+          <div className="mt-3 space-y-2">
+            <p className="text-xs text-mist">La stanza si estende verso est e sud a partire da questa casella:</p>
+            <div className="grid gap-2">
+              {options.map((def) => {
+                const block = canPlace(game, def.type as RoomType, c, r);
+                return (
+                  <button
+                    key={def.type}
+                    type="button"
+                    disabled={Boolean(block)}
+                    className={`rounded-2xl border p-3 text-left transition-all active:scale-[0.98] cursor-pointer shadow-xs ${
+                      block
+                        ? "border-line/40 bg-paper/50 opacity-60 cursor-not-allowed"
+                        : "border-line bg-paper hover:border-teal hover:bg-card hover:shadow-md"
+                    }`}
+                    onClick={() => {
+                      soundClick();
+                      const result = placeRoom(game, def.type, c, r);
+                      apply(result);
+                      if (typeof result !== "string") close();
+                    }}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-sm text-ink">{def.name}</span>
+                      <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-card border border-line text-mist font-semibold">
+                        {def.w}×{def.h}
+                      </span>
+                    </div>
+                    <p className="text-xs text-mist line-clamp-2 mt-1">
+                      {block ? <span className="text-amber font-medium">{block}</span> : def.blurb}
+                    </p>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-[11px] text-mist">{def.anchors} ancoraggi</span>
+                      <span className="font-display text-amber font-bold text-sm">{euro(def.shell)}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )
       ) : null}

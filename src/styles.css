@@ -186,10 +186,19 @@
 
 .sheet {
   background:
-    radial-gradient(140% 90px at 50% 0%, rgba(27, 122, 100, 0.1), transparent 60%),
-    #f7fbf9;
-  border: 1px solid #d3e0da;
-  box-shadow: 0 -20px 48px rgba(14, 30, 35, 0.18);
+    radial-gradient(140% 90px at 50% 0%, rgba(27, 122, 100, 0.08), transparent 60%),
+    rgba(247, 251, 249, 0.96);
+  border: 1px solid rgba(211, 224, 218, 0.85);
+  box-shadow: 0 -12px 32px rgba(14, 30, 35, 0.12);
+  backdrop-filter: blur(20px);
+}
+
+@media (min-width: 768px) {
+  .sheet {
+    box-shadow:
+      0 20px 48px -8px rgba(14, 30, 35, 0.28),
+      0 0 0 1px rgba(255, 255, 255, 0.8) inset;
+  }
 }
 
 .dossier {

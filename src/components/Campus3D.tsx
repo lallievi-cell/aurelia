@@ -25,6 +25,7 @@ export interface Campus3DProps {
   selectedRoomId: string | null;
   selectedCell: { c: number; r: number } | null;
   movingRoomId: string | null;
+  inspectorOpen?: boolean;
   onSelectRoom: (roomId: string) => void;
   onSelectTile: (cell: { c: number; r: number }) => void;
   onSelectParcel: (parcelId: string) => void;
@@ -39,6 +40,7 @@ export const Campus3D: React.FC<Campus3DProps> = ({
   selectedRoomId,
   selectedCell,
   movingRoomId,
+  inspectorOpen,
   onSelectRoom,
   onSelectTile,
   onSelectParcel,
@@ -326,7 +328,11 @@ export const Campus3D: React.FC<Campus3DProps> = ({
       )}
 
       {/* Floating Camera Controls: 360 Rotation, Zoom, Focus (Bottom Right) */}
-      <div className="absolute bottom-4 right-4 flex flex-col gap-2 z-10 pointer-events-auto">
+      <div
+        className={`absolute bottom-4 flex flex-col gap-2 z-10 pointer-events-auto transition-all duration-300 ease-out ${
+          inspectorOpen ? "right-4 md:right-[432px]" : "right-4"
+        }`}
+      >
         {/* Rotate Left (Q) */}
         <button
           type="button"
