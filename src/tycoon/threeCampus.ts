@@ -38,28 +38,29 @@ const ROOM_THEMES: Record<
     accent: number;
     trim: number;
     name: string;
+    grade: string;
     motif: "hazard" | "sterile" | "dock" | "clinical" | "office" | "water" | "power";
   }
 > = {
-  hq: { floor: 0xf5faf7, wall: 0x1b7a64, accent: 0xc88812, trim: 0x8a5a34, name: "Direzione", motif: "office" },
-  gown: { floor: 0xedf2f0, wall: 0x4a6b63, accent: 0x1b7a64, trim: 0xd97706, name: "Spogliatoio", motif: "sterile" },
-  warehouse: { floor: 0xd4b58e, wall: 0x6e4a28, accent: 0xc88812, trim: 0xf59e0b, name: "Magazzino", motif: "dock" },
-  quarantine: { floor: 0xebcf8c, wall: 0x8a5818, accent: 0xd97706, trim: 0x1e293b, name: "Quarantena", motif: "hazard" },
-  cold: { floor: 0xd0ebf7, wall: 0x366885, accent: 0x0284c7, trim: 0x93c5fd, name: "Cella Frigo", motif: "sterile" },
-  shipping: { floor: 0xd9c4ab, wall: 0x6b4f35, accent: 0x8a5a34, trim: 0xf59e0b, name: "Spedizioni", motif: "dock" },
-  pilot: { floor: 0xecd082, wall: 0xb5780a, accent: 0xc88812, trim: 0xf59e0b, name: "Locale Pilota", motif: "hazard" },
-  plant: { floor: 0xc4d8dc, wall: 0x143b42, accent: 0x0f766e, trim: 0xf59e0b, name: "Impianto GMP", motif: "hazard" },
-  pack: { floor: 0xe8c79e, wall: 0x7a4d29, accent: 0xb45309, trim: 0xc88812, name: "Confezionamento", motif: "dock" },
-  sterile: { floor: 0xffffff, wall: 0x0d5c52, accent: 0x10b981, trim: 0x34d399, name: "Suite Sterile", motif: "sterile" },
-  qc: { floor: 0xdaf0ca, wall: 0x315c34, accent: 0x1b7a64, trim: 0x10b981, name: "Laboratorio QC", motif: "sterile" },
-  stability: { floor: 0xdcf0d4, wall: 0x3d5c36, accent: 0x16a34a, trim: 0x4ade80, name: "Stabilità", motif: "sterile" },
-  discovery: { floor: 0xcbece0, wall: 0x10594b, accent: 0x0d9488, trim: 0x14b8a6, name: "Lab Scoperta", motif: "sterile" },
-  preclinical: { floor: 0xbfe4d4, wall: 0x0d4c40, accent: 0x059669, trim: 0x10b981, name: "Lab Preclinico", motif: "sterile" },
-  phase1: { floor: 0xdee7f2, wall: 0x324763, accent: 0x2563eb, trim: 0x60a5fa, name: "Unità Fase I", motif: "clinical" },
-  phase23: { floor: 0xd1e0ee, wall: 0x223650, accent: 0x1d4ed8, trim: 0x3b82f6, name: "Unità Fase II/III", motif: "clinical" },
-  regulatory: { floor: 0xf2e8cd, wall: 0x1a2f35, accent: 0xc88812, trim: 0x78350f, name: "Affari Regolatori", motif: "office" },
-  power: { floor: 0xcdd5d6, wall: 0x1f3035, accent: 0xf59e0b, trim: 0xef4444, name: "Centralina", motif: "power" },
-  water: { floor: 0xbfe0e8, wall: 0x164c58, accent: 0x06b6d4, trim: 0x38bdf8, name: "Acque", motif: "water" },
+  hq: { floor: 0xf8fafc, wall: 0x1b7a64, accent: 0xc88812, trim: 0x8a5a34, name: "Direzione Generale", grade: "EXECUTIVE HQ", motif: "office" },
+  gown: { floor: 0xf1f5f9, wall: 0x4a6b63, accent: 0x0284c7, trim: 0x38bdf8, name: "Spogliatoio Airlock", grade: "ISO 7 / CNC", motif: "sterile" },
+  warehouse: { floor: 0xe2e8f0, wall: 0x6e4a28, accent: 0xd97706, trim: 0xf59e0b, name: "Magazzino GMP", grade: "MAG / CNC", motif: "dock" },
+  quarantine: { floor: 0xfef08a, wall: 0x8a5818, accent: 0xb45309, trim: 0x1e293b, name: "Area Quarantena", grade: "QC HOLD", motif: "hazard" },
+  cold: { floor: 0xdbeafe, wall: 0x366885, accent: 0x0284c7, trim: 0x60a5fa, name: "Cella Frigo 2-8°C", grade: "COLD CHAIN", motif: "sterile" },
+  shipping: { floor: 0xe2e8f0, wall: 0x6b4f35, accent: 0x92400e, trim: 0xf59e0b, name: "Baia Spedizioni", grade: "DOCK / LOG", motif: "dock" },
+  pilot: { floor: 0xfef3c7, wall: 0xb5780a, accent: 0xd97706, trim: 0xf59e0b, name: "Locale Pilota", grade: "GRADE D", motif: "hazard" },
+  plant: { floor: 0xe0f2fe, wall: 0x143b42, accent: 0x0284c7, trim: 0xf59e0b, name: "Impianto GMP Bulk", grade: "GRADE C", motif: "hazard" },
+  pack: { floor: 0xf1f5f9, wall: 0x7a4d29, accent: 0xb45309, trim: 0xc88812, name: "Confezionamento", grade: "GRADE D", motif: "dock" },
+  sterile: { floor: 0xf8fafc, wall: 0x0d5c52, accent: 0x059669, trim: 0x10b981, name: "Suite Sterile Aseptic", grade: "GRADE A / B", motif: "sterile" },
+  qc: { floor: 0xecfdf5, wall: 0x315c34, accent: 0x059669, trim: 0x34d399, name: "Laboratorio QC", grade: "GLP / ANALYTICAL", motif: "sterile" },
+  stability: { floor: 0xf0fdf4, wall: 0x3d5c36, accent: 0x16a34a, trim: 0x4ade80, name: "Camere Stabilità ICH", grade: "ICH STABILITY", motif: "sterile" },
+  discovery: { floor: 0xecfeff, wall: 0x10594b, accent: 0x0891b2, trim: 0x06b6d4, name: "Lab Drug Discovery", grade: "R&D DISCOVERY", motif: "sterile" },
+  preclinical: { floor: 0xf0fdfa, wall: 0x0d4c40, accent: 0x0d9488, trim: 0x14b8a6, name: "Lab Preclinico GLP", grade: "PRECLINICAL", motif: "sterile" },
+  phase1: { floor: 0xeff6ff, wall: 0x324763, accent: 0x2563eb, trim: 0x60a5fa, name: "Unità Clinica Fase I", grade: "GCP CLINICAL", motif: "clinical" },
+  phase23: { floor: 0xeff6ff, wall: 0x223650, accent: 0x1d4ed8, trim: 0x3b82f6, name: "Unità Clinica Fase II/III", grade: "GCP ADVANCED", motif: "clinical" },
+  regulatory: { floor: 0xfef9c3, wall: 0x1a2f35, accent: 0xca8a04, trim: 0x854d0e, name: "Uffici Direzione & Regolatorio", grade: "EXECUTIVE SUITE", motif: "office" },
+  power: { floor: 0x334155, wall: 0x1f3035, accent: 0xf59e0b, trim: 0xef4444, name: "Centrale Elettrica & UPS", grade: "UTILITIES 400V", motif: "power" },
+  water: { floor: 0xe0f2fe, wall: 0x164c58, accent: 0x0284c7, trim: 0x38bdf8, name: "Impianto Acqua PW / WFI", grade: "USP / EP WATER", motif: "water" },
 };
 
 interface StaffAgent {
@@ -67,11 +68,12 @@ interface StaffAgent {
   role: Role;
   roomId: string;
   group: THREE.Group;
-  leftLeg: THREE.Mesh;
-  rightLeg: THREE.Mesh;
+  leftLegGroup: THREE.Group;
+  rightLegGroup: THREE.Group;
   leftArm: THREE.Mesh;
   rightArm: THREE.Mesh;
   head: THREE.Mesh;
+  roleGem?: THREE.Mesh;
   currentPos: THREE.Vector3;
   targetPos: THREE.Vector3;
   homePos: THREE.Vector3;
@@ -119,6 +121,7 @@ export class ThreeCampus {
   private mouse = new THREE.Vector2();
 
   // Scene object groups
+  private environmentGroup = new THREE.Group();
   private groundGroup = new THREE.Group();
   private buildingsGroup = new THREE.Group();
   private corridorsGroup = new THREE.Group();
@@ -153,9 +156,10 @@ export class ThreeCampus {
     const height = container.clientHeight || 600;
     const aspect = width / height;
 
-    // 1. Scene
+    // 1. Scene with soft atmospheric haze and sky dome
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0xdceee7);
+    this.scene.fog = new THREE.FogExp2(0xdceee7, 0.007);
 
     // 2. Camera (True Isometric Orthographic)
     const frustumSize = this.currentZoom;
@@ -176,13 +180,14 @@ export class ThreeCampus {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMappingExposure = 1.08;
     this.container.appendChild(this.renderer.domElement);
 
     // 4. Lighting
     this.setupLighting();
 
-    // 5. Add Groups to Scene
+    // 5. Add Groups to Scene (Environment first as background foundation)
+    this.scene.add(this.environmentGroup);
     this.scene.add(this.groundGroup);
     this.scene.add(this.corridorsGroup);
     this.scene.add(this.buildingsGroup);
@@ -200,25 +205,34 @@ export class ThreeCampus {
   }
 
   private setupLighting() {
-    const hemiLight = new THREE.HemisphereLight(0xd9f3ea, 0xb0cbbd, 0.85);
+    // Rich natural sky hemisphere light
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x7c9b8f, 0.95);
     this.scene.add(hemiLight);
 
-    const sunLight = new THREE.DirectionalLight(0xfffaed, 1.4);
-    sunLight.position.set(35, 55, 25);
+    // Golden sunlight with soft high-res photographic shadows
+    const sunLight = new THREE.DirectionalLight(0xfff6e6, 1.6);
+    sunLight.position.set(40, 60, 30);
     sunLight.castShadow = true;
-    sunLight.shadow.mapSize.width = 2048;
-    sunLight.shadow.mapSize.height = 2048;
-    const d = 42;
+    sunLight.shadow.mapSize.width = 4096;
+    sunLight.shadow.mapSize.height = 4096;
+    const d = 55;
     sunLight.shadow.camera.left = -d;
     sunLight.shadow.camera.right = d;
     sunLight.shadow.camera.top = d;
     sunLight.shadow.camera.bottom = -d;
-    sunLight.shadow.bias = -0.0003;
+    sunLight.shadow.bias = -0.0002;
+    sunLight.shadow.radius = 2.0;
     this.scene.add(sunLight);
 
-    const rimLight = new THREE.DirectionalLight(0x7ecbb5, 0.45);
-    rimLight.position.set(-25, 20, -35);
+    // Cool ambient mint fill light from opposite angle
+    const rimLight = new THREE.DirectionalLight(0x9bd8c8, 0.55);
+    rimLight.position.set(-30, 24, -40);
     this.scene.add(rimLight);
+
+    // Soft warm ground bounce
+    const softBounce = new THREE.DirectionalLight(0xfef08a, 0.2);
+    softBounce.position.set(0, -20, 0);
+    this.scene.add(softBounce);
   }
 
   private updateCameraPosition() {
@@ -546,6 +560,7 @@ export class ThreeCampus {
     this.animatedEmissives = [];
     this.staffAgents = [];
 
+    this.clearGroup(this.environmentGroup);
     this.clearGroup(this.groundGroup);
     this.clearGroup(this.corridorsGroup);
     this.clearGroup(this.buildingsGroup);
@@ -553,25 +568,518 @@ export class ThreeCampus {
     this.clearGroup(this.staffGroup);
     this.clearGroup(this.effectsGroup);
 
+    this.buildEnvironment(game);
     this.buildTerrain(game);
     this.buildCorridors(game);
     this.buildRooms(game);
   }
 
   // ------------------------------------------
-  // TERRAIN & PARCELS
+  // 1. CAMPUS EXTERIOR ENVIRONMENT & UTILITIES
+  // ------------------------------------------
+  private buildEnvironment(game: Game) {
+    const campusWidth = COLS * TILE_SIZE;
+    const campusDepth = ROWS * TILE_SIZE;
+
+    // 1. Vast Natural Landscape Terrain
+    const grassGeo = new THREE.PlaneGeometry(180, 180);
+    const grassMat = new THREE.MeshStandardMaterial({
+      color: 0x427552, // Rich organic park lawn
+      roughness: 0.96,
+      metalness: 0.02,
+    });
+    const grassMesh = new THREE.Mesh(grassGeo, grassMat);
+    grassMesh.rotation.x = -Math.PI / 2;
+    grassMesh.position.y = -0.32;
+    grassMesh.receiveShadow = true;
+    this.environmentGroup.add(grassMesh);
+
+    // 2. Concrete Campus Podium Under the Grid (strictly lower than tile surface to prevent z-fighting)
+    const plinthMat = new THREE.MeshStandardMaterial({
+      color: 0x94a3b8, // Clean industrial foundation concrete
+      roughness: 0.8,
+      metalness: 0.05,
+    });
+    const plinth = new THREE.Mesh(
+      new THREE.BoxGeometry(campusWidth + 3.2, 0.24, campusDepth + 3.2),
+      plinthMat
+    );
+    plinth.position.set(0, -0.24, 0);
+    plinth.receiveShadow = true;
+    this.environmentGroup.add(plinth);
+
+    // Perimeter curb stone around the foundation
+    const curbMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.5 });
+    const curbNorth = new THREE.Mesh(new THREE.BoxGeometry(campusWidth + 3.4, 0.16, 0.4), curbMat);
+    curbNorth.position.set(0, -0.12, -campusDepth / 2 - 1.4);
+    this.environmentGroup.add(curbNorth);
+
+    const curbWest = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.16, campusDepth + 3.4), curbMat);
+    curbWest.position.set(-campusWidth / 2 - 1.4, -0.12, 0);
+    this.environmentGroup.add(curbWest);
+
+    // 3. Perimeter Asphalt Two-Lane Roadway (South & East Borders)
+    const roadMat = new THREE.MeshStandardMaterial({ color: 0x273038, roughness: 0.85 });
+    const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const yellowLineMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
+
+    // South Road
+    const roadZ = campusDepth / 2 + 4.2;
+    const roadWidth = 5.4;
+    const roadLength = campusWidth + 24;
+    const southRoad = new THREE.Mesh(new THREE.BoxGeometry(roadLength, 0.12, roadWidth), roadMat);
+    southRoad.position.set(0, -0.22, roadZ);
+    southRoad.receiveShadow = true;
+    this.environmentGroup.add(southRoad);
+
+    const southDblLine = new THREE.Mesh(new THREE.BoxGeometry(roadLength - 2, 0.02, 0.16), yellowLineMat);
+    southDblLine.position.set(0, -0.15, roadZ);
+    this.environmentGroup.add(southDblLine);
+
+    // East Road
+    const roadX = campusWidth / 2 + 4.2;
+    const eastRoad = new THREE.Mesh(new THREE.BoxGeometry(roadWidth, 0.12, campusDepth + 24), roadMat);
+    eastRoad.position.set(roadX, -0.22, 0);
+    eastRoad.receiveShadow = true;
+    this.environmentGroup.add(eastRoad);
+
+    const eastDblLine = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.02, campusDepth + 20), yellowLineMat);
+    eastDblLine.position.set(roadX, -0.15, 0);
+    this.environmentGroup.add(eastDblLine);
+
+    // Painted Pedestrian Crosswalk (Zebra Stripes) leading into the campus gate
+    for (let i = 0; i < 7; i++) {
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.02, 2.6), lineMat);
+      stripe.position.set(-2.4 + i * 0.8, -0.15, roadZ);
+      this.environmentGroup.add(stripe);
+    }
+
+    // 4. Security Entrance Gatehouse & Barrier
+    this.buildGatehouse(-5.8, -0.16, roadZ - roadWidth / 2 - 1.2);
+
+    // 5. Parking Lot with Delivery Van and Cars
+    this.buildParkingLot(8.5, -0.22, roadZ - 2.8);
+
+    // 6. External Industrial Utilities: Liquid Nitrogen Tanks, Electrical Substation, Chillers
+    this.buildIndustrialUtilities(-campusWidth / 2 - 4.5, -0.22, -2);
+
+    // 7. Perimeter Landscaping & Modern Lighting
+    this.buildPerimeterLandscaping(campusWidth, campusDepth, roadZ, roadX);
+  }
+
+  private buildGatehouse(x: number, y: number, z: number) {
+    const group = new THREE.Group();
+    group.position.set(x, y, z);
+
+    // Concrete island
+    const island = new THREE.Mesh(
+      new THREE.BoxGeometry(3.6, 0.22, 2.2),
+      new THREE.MeshStandardMaterial({ color: 0xc8d5cf, roughness: 0.6 })
+    );
+    island.position.y = 0.11;
+    island.receiveShadow = true;
+    group.add(island);
+
+    // Booth building
+    const boothMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.3 });
+    const booth = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.4, 1.4), boothMat);
+    booth.position.set(-0.6, 0.92, 0);
+    booth.castShadow = true;
+    group.add(booth);
+
+    // Glass windows
+    const glassMat = new THREE.MeshPhysicalMaterial({ color: 0x38bdf8, roughness: 0.1, transmission: 0.85, transparent: true });
+    const windowMesh = new THREE.Mesh(new THREE.BoxGeometry(1.64, 0.6, 1.44), glassMat);
+    windowMesh.position.set(-0.6, 1.05, 0);
+    group.add(windowMesh);
+
+    // Canopy roof
+    const roof = new THREE.Mesh(
+      new THREE.BoxGeometry(3.2, 0.14, 2.4),
+      new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4 })
+    );
+    roof.position.set(-0.1, 1.7, 0);
+    roof.castShadow = true;
+    group.add(roof);
+
+    // Boom barrier
+    const barrierPost = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.12, 0.14, 0.85, 8),
+      new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.3 })
+    );
+    barrierPost.position.set(0.9, 0.54, 0);
+    group.add(barrierPost);
+
+    const barrierArm = new THREE.Mesh(
+      new THREE.BoxGeometry(2.4, 0.08, 0.06),
+      new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.3 })
+    );
+    barrierArm.position.set(2.1, 0.85, 0);
+    group.add(barrierArm);
+
+    // Entrance Monument
+    const monument = new THREE.Mesh(
+      new THREE.BoxGeometry(2.6, 1.1, 0.35),
+      new THREE.MeshStandardMaterial({ color: 0x1b7a64, roughness: 0.35 })
+    );
+    monument.position.set(-2.8, 0.66, 0);
+    monument.castShadow = true;
+    group.add(monument);
+
+    const goldPlaque = new THREE.Mesh(
+      new THREE.BoxGeometry(2.2, 0.45, 0.38),
+      new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.85, roughness: 0.25 })
+    );
+    goldPlaque.position.set(-2.8, 0.72, 0);
+    group.add(goldPlaque);
+
+    this.environmentGroup.add(group);
+  }
+
+  private buildParkingLot(x: number, y: number, z: number) {
+    const group = new THREE.Group();
+    group.position.set(x, y, z);
+
+    // Asphalt surface
+    const lotMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(9.6, 0.14, 5.2),
+      new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.85 })
+    );
+    lotMesh.position.y = 0.07;
+    lotMesh.receiveShadow = true;
+    group.add(lotMesh);
+
+    // Parking bay stripes
+    const paintMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    for (let i = 0; i <= 5; i++) {
+      const line = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.02, 2.2), paintMat);
+      line.position.set(-3.75 + i * 1.5, 0.15, -1.2);
+      group.add(line);
+    }
+
+    // Pharma Delivery Box Van
+    this.createCar(group, -3.0, 0.14, -1.2, 0x0284c7, true);
+    // Passenger Cars
+    this.createCar(group, -1.5, 0.14, -1.2, 0xe2e8f0, false);
+    this.createCar(group, 0.0, 0.14, -1.2, 0x1e3a8a, false);
+    this.createCar(group, 1.5, 0.14, -1.2, 0x991b1b, false);
+    this.createCar(group, 3.0, 0.14, -1.2, 0x059669, false);
+
+    this.environmentGroup.add(group);
+  }
+
+  private createCar(parent: THREE.Group, x: number, y: number, z: number, color: number, isVan: boolean) {
+    const carGroup = new THREE.Group();
+    carGroup.position.set(x, y, z);
+
+    const carMat = new THREE.MeshStandardMaterial({ color, roughness: 0.25, metalness: 0.6 });
+    const glassMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.1 });
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.8 });
+
+    if (isVan) {
+      // Cab
+      const cab = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.9, 1.0), carMat);
+      cab.position.set(0, 0.65, 0.6);
+      cab.castShadow = true;
+      carGroup.add(cab);
+
+      // Windshield
+      const windshield = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.45, 0.4), glassMat);
+      windshield.position.set(0, 0.8, 0.8);
+      carGroup.add(windshield);
+
+      // Cargo box
+      const cargo = new THREE.Mesh(
+        new THREE.BoxGeometry(1.2, 1.25, 1.5),
+        new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.3 })
+      );
+      cargo.position.set(0, 0.82, -0.45);
+      cargo.castShadow = true;
+      carGroup.add(cargo);
+
+      // Cyan logo stripe
+      const stripe = new THREE.Mesh(
+        new THREE.BoxGeometry(1.22, 0.2, 1.52),
+        new THREE.MeshStandardMaterial({ color: 0x06b6d4, roughness: 0.3 })
+      );
+      stripe.position.set(0, 0.82, -0.45);
+      carGroup.add(stripe);
+    } else {
+      // Passenger car body
+      const lowerBody = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.45, 1.8), carMat);
+      lowerBody.position.y = 0.4;
+      lowerBody.castShadow = true;
+      carGroup.add(lowerBody);
+
+      const cabin = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.42, 1.0), glassMat);
+      cabin.position.set(0, 0.76, -0.1);
+      cabin.castShadow = true;
+      carGroup.add(cabin);
+
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.06, 0.95), carMat);
+      roof.position.set(0, 0.98, -0.1);
+      carGroup.add(roof);
+    }
+
+    // 4 Wheels
+    for (const wx of [-0.52, 0.52]) {
+      for (const wz of [-0.55, 0.55]) {
+        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.12, 12), wheelMat);
+        wheel.rotation.z = Math.PI / 2;
+        wheel.position.set(wx, 0.2, wz);
+        carGroup.add(wheel);
+      }
+    }
+
+    parent.add(carGroup);
+  }
+
+  private buildIndustrialUtilities(x: number, y: number, z: number) {
+    const group = new THREE.Group();
+    group.position.set(x, y, z);
+
+    // Concrete utility pad
+    const pad = new THREE.Mesh(
+      new THREE.BoxGeometry(6.4, 0.24, 12.8),
+      new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.8 })
+    );
+    pad.position.y = 0.12;
+    pad.receiveShadow = true;
+    group.add(pad);
+
+    const metalMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.2, metalness: 0.8 });
+    const pipeMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.6, roughness: 0.3 });
+
+    // 1. Two Large Liquid Nitrogen (LN2) Bulk Cryogenic Tanks
+    for (let i = 0; i < 2; i++) {
+      const tankZ = -3.2 + i * 3.2;
+      const tankBody = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.9, 0.9, 3.4, 20),
+        new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.18, metalness: 0.3 })
+      );
+      tankBody.position.set(-1.2, 1.94, tankZ);
+      tankBody.castShadow = true;
+      group.add(tankBody);
+
+      const dome = new THREE.Mesh(
+        new THREE.SphereGeometry(0.9, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2),
+        new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.18, metalness: 0.3 })
+      );
+      dome.position.set(-1.2, 3.64, tankZ);
+      group.add(dome);
+
+      // Cage ladder
+      const ladder = new THREE.Mesh(new THREE.BoxGeometry(0.2, 3.4, 0.1), metalMat);
+      ladder.position.set(-1.2, 1.94, tankZ + 0.95);
+      group.add(ladder);
+
+      // Cryo piping
+      const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.2, 8), pipeMat);
+      pipe.position.set(-0.2, 1.34, tankZ);
+      group.add(pipe);
+    }
+
+    // 2. High-Voltage Electrical Transformer Substation
+    const transformerBox = new THREE.Mesh(
+      new THREE.BoxGeometry(2.0, 1.6, 2.2),
+      new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.7, roughness: 0.3 })
+    );
+    transformerBox.position.set(1.4, 1.04, -2.4);
+    transformerBox.castShadow = true;
+    group.add(transformerBox);
+
+    // Radiator cooling fins
+    for (let f = 0; f < 5; f++) {
+      const fin = new THREE.Mesh(new THREE.BoxGeometry(0.04, 1.2, 1.8), metalMat);
+      fin.position.set(0.3 + f * 0.12, 1.04, -2.4);
+      group.add(fin);
+    }
+
+    // Ceramic insulators on top
+    for (let c = 0; c < 3; c++) {
+      const insulator = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.08, 0.12, 0.45, 8),
+        new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.4 })
+      );
+      insulator.position.set(1.0 + c * 0.4, 2.05, -2.4);
+      group.add(insulator);
+    }
+
+    // 3. Commercial HVAC Rooftop/Ground Chillers with Dual Spinning Fans!
+    for (let k = 0; k < 2; k++) {
+      const chillerZ = 2.4 + k * 2.2;
+      const chillerMesh = new THREE.Mesh(
+        new THREE.BoxGeometry(2.2, 1.2, 1.8),
+        new THREE.MeshStandardMaterial({ color: 0xcfd8dc, roughness: 0.4 })
+      );
+      chillerMesh.position.set(1.3, 0.84, chillerZ);
+      chillerMesh.castShadow = true;
+      group.add(chillerMesh);
+
+      // 2 Spinning Fan Blades on Top!
+      for (const fx of [0.85, 1.75]) {
+        const fanRing = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.35, 0.35, 0.08, 16),
+          new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.6 })
+        );
+        fanRing.position.set(fx, 1.48, chillerZ);
+        group.add(fanRing);
+
+        const fanBlade = new THREE.Mesh(
+          new THREE.BoxGeometry(0.6, 0.02, 0.1),
+          new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8 })
+        );
+        fanBlade.position.set(fx, 1.5, chillerZ);
+        group.add(fanBlade);
+        this.animatedSpinners.push({ mesh: fanBlade, speed: 12 });
+      }
+    }
+
+    this.environmentGroup.add(group);
+  }
+
+  private buildPerimeterLandscaping(campusW: number, campusD: number, roadZ: number, roadX: number) {
+    const treePositions = [
+      { x: -campusW / 2 - 2, z: roadZ + 3, type: "cypress" },
+      { x: -campusW / 2 + 6, z: roadZ + 3, type: "oak" },
+      { x: 0, z: roadZ + 3, type: "cypress" },
+      { x: 8, z: roadZ + 3, type: "oak" },
+      { x: campusW / 2 + 2, z: roadZ + 3, type: "cypress" },
+      { x: roadX + 3, z: -campusD / 2 - 2, type: "oak" },
+      { x: roadX + 3, z: 0, type: "cypress" },
+      { x: roadX + 3, z: 6, type: "oak" },
+      { x: roadX + 3, z: campusD / 2 + 2, type: "cypress" },
+      { x: -14, z: -campusD / 2 - 3, type: "oak" },
+      { x: -8, z: -campusD / 2 - 3, type: "cypress" },
+      { x: 2, z: -campusD / 2 - 3, type: "oak" },
+      { x: 10, z: -campusD / 2 - 3, type: "cypress" },
+      { x: -campusW / 2 - 5, z: -8, type: "cypress" },
+      { x: -campusW / 2 - 5, z: 4, type: "oak" },
+    ];
+
+    for (const t of treePositions) {
+      if (t.type === "cypress") {
+        this.createCypressTree(t.x, -0.32, t.z);
+      } else {
+        this.createLushOakTree(t.x, -0.32, t.z);
+      }
+    }
+
+    // Street Lamps along roads
+    const lampPositions = [
+      { x: -8, z: roadZ - 0.4 },
+      { x: 2, z: roadZ - 0.4 },
+      { x: 12, z: roadZ - 0.4 },
+      { x: roadX - 0.4, z: -6 },
+      { x: roadX - 0.4, z: 4 },
+      { x: roadX - 0.4, z: 12 },
+    ];
+
+    for (const lp of lampPositions) {
+      this.createStreetLamp(lp.x, -0.22, lp.z);
+    }
+  }
+
+  private createCypressTree(x: number, y: number, z: number) {
+    const group = new THREE.Group();
+    group.position.set(x, y, z);
+
+    const trunk = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.12, 0.16, 0.8, 6),
+      new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.9 })
+    );
+    trunk.position.y = 0.4;
+    trunk.castShadow = true;
+    group.add(trunk);
+
+    const foliage = new THREE.Mesh(
+      new THREE.ConeGeometry(0.65, 3.4, 8),
+      new THREE.MeshStandardMaterial({ color: 0x1b4332, roughness: 0.85 })
+    );
+    foliage.position.y = 2.4;
+    foliage.castShadow = true;
+    group.add(foliage);
+
+    this.environmentGroup.add(group);
+  }
+
+  private createLushOakTree(x: number, y: number, z: number) {
+    const group = new THREE.Group();
+    group.position.set(x, y, z);
+
+    const trunk = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.18, 0.24, 1.2, 6),
+      new THREE.MeshStandardMaterial({ color: 0x4a3525, roughness: 0.9 })
+    );
+    trunk.position.y = 0.6;
+    trunk.castShadow = true;
+    group.add(trunk);
+
+    const leafMat1 = new THREE.MeshStandardMaterial({ color: 0x2d6a4f, roughness: 0.8 });
+    const leafMat2 = new THREE.MeshStandardMaterial({ color: 0x40916c, roughness: 0.8 });
+
+    const c1 = new THREE.Mesh(new THREE.SphereGeometry(1.0, 8, 6), leafMat1);
+    c1.position.set(0, 2.0, 0);
+    c1.castShadow = true;
+    group.add(c1);
+
+    const c2 = new THREE.Mesh(new THREE.SphereGeometry(0.75, 8, 6), leafMat2);
+    c2.position.set(0.4, 2.5, 0.2);
+    c2.castShadow = true;
+    group.add(c2);
+
+    const c3 = new THREE.Mesh(new THREE.SphereGeometry(0.7, 8, 6), leafMat1);
+    c3.position.set(-0.35, 2.3, -0.3);
+    c3.castShadow = true;
+    group.add(c3);
+
+    this.environmentGroup.add(group);
+  }
+
+  private createStreetLamp(x: number, y: number, z: number) {
+    const group = new THREE.Group();
+    group.position.set(x, y, z);
+
+    const metalMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.85, roughness: 0.2 });
+
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 2.8, 8), metalMat);
+    pole.position.y = 1.4;
+    pole.castShadow = true;
+    group.add(pole);
+
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.06, 0.06), metalMat);
+    arm.position.set(0.3, 2.8, 0);
+    group.add(arm);
+
+    const lampHead = new THREE.Mesh(
+      new THREE.BoxGeometry(0.3, 0.08, 0.16),
+      new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        emissive: 0xfef08a,
+        emissiveIntensity: 0.8,
+        roughness: 0.2,
+      })
+    );
+    lampHead.position.set(0.55, 2.76, 0);
+    group.add(lampHead);
+
+    this.environmentGroup.add(group);
+  }
+
+  // ------------------------------------------
+  // 2. TERRAIN, LOTS & LANDSCAPED GARDENS
   // ------------------------------------------
   private buildTerrain(game: Game) {
-    const slabGeo = new THREE.BoxGeometry(TILE_SIZE * 0.96, 0.25, TILE_SIZE * 0.96);
+    const slabGeo = new THREE.BoxGeometry(TILE_SIZE * 0.992, 0.22, TILE_SIZE * 0.992);
 
-    const matOwnedLot = new THREE.MeshStandardMaterial({ color: 0xbedcd0, roughness: 0.6, metalness: 0.05 });
-    const matGarden = new THREE.MeshStandardMaterial({ color: 0x5a9a7a, roughness: 0.8, metalness: 0.02 });
-    const matUnowned = new THREE.MeshStandardMaterial({ color: 0xc8d4ce, roughness: 0.85, metalness: 0.05 });
+    const matOwnedLot = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.65, metalness: 0.05 });
+    const matGarden = new THREE.MeshStandardMaterial({ color: 0x228b48, roughness: 0.85, metalness: 0.02 });
+    const matUnowned = new THREE.MeshStandardMaterial({ color: 0x3d7049, roughness: 0.92, metalness: 0.02 });
     const matSelected = new THREE.MeshStandardMaterial({
       color: 0xf59e0b,
-      roughness: 0.4,
+      roughness: 0.35,
       emissive: 0xd97706,
-      emissiveIntensity: 0.35,
+      emissiveIntensity: 0.45,
     });
 
     for (let r = 0; r < ROWS; r++) {
@@ -590,85 +1098,155 @@ export class ThreeCampus {
         if (isSelected && !tile.roomId) mat = matSelected;
 
         const slab = new THREE.Mesh(slabGeo, mat);
-        slab.position.set(posX, -0.125, posZ);
+        slab.position.set(posX, -0.11, posZ);
         slab.receiveShadow = true;
         slab.userData = { type: "tile", c, r };
         this.groundGroup.add(slab);
         this.interactiveMeshes.push(slab);
 
-        // Stylized 3D trees on garden tiles
+        // Rich decorative 3D park gardens on garden tiles
         if (tile.ground === "garden" && !tile.roomId && !tile.corridor) {
-          this.createTree(posX, 0, posZ);
+          this.createGardenFeatures(posX, 0, posZ);
+        }
+
+        // Surveyor stake markers on unowned parcels
+        if (!isOwned && ((c + r) % 3 === 0)) {
+          this.createSurveyorStake(posX, 0, posZ);
         }
       }
     }
 
-    // Unowned parcel billboards
+    // Unowned parcel billboards: "LOTTO DISPONIBILE"
     for (const p of PARCELS) {
       if (game.owned.includes(p.id)) continue;
 
       const centerX = ((p.c0 + p.c1) / 2 - COLS / 2) * TILE_SIZE;
       const centerZ = ((p.r0 + p.r1) / 2 - ROWS / 2) * TILE_SIZE;
 
-      const signPost = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.08, 0.08, 1.6, 8),
-        new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.5 })
+      const signGroup = new THREE.Group();
+      signGroup.position.set(centerX, 0, centerZ);
+      signGroup.userData = { type: "parcel", parcelId: p.id };
+
+      const signPost1 = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.08, 0.08, 1.8, 8),
+        new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.7 })
       );
-      signPost.position.set(centerX, 0.8, centerZ);
-      signPost.castShadow = true;
-      signPost.userData = { type: "parcel", parcelId: p.id };
-      this.groundGroup.add(signPost);
-      this.interactiveMeshes.push(signPost);
+      signPost1.position.set(-0.6, 0.9, 0);
+      signPost1.castShadow = true;
+      signGroup.add(signPost1);
+
+      const signPost2 = signPost1.clone();
+      signPost2.position.set(0.6, 0.9, 0);
+      signGroup.add(signPost2);
 
       const signBoard = new THREE.Mesh(
-        new THREE.BoxGeometry(1.6, 0.9, 0.12),
-        new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.3 })
+        new THREE.BoxGeometry(1.8, 1.0, 0.12),
+        new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.35, metalness: 0.2 })
       );
-      signBoard.position.set(centerX, 1.45, centerZ);
+      signBoard.position.set(0, 1.5, 0);
       signBoard.castShadow = true;
-      signBoard.userData = { type: "parcel", parcelId: p.id };
-      this.groundGroup.add(signBoard);
+      signGroup.add(signBoard);
+
+      const signHeader = new THREE.Mesh(
+        new THREE.BoxGeometry(1.7, 0.3, 0.14),
+        new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4 })
+      );
+      signHeader.position.set(0, 1.8, 0);
+      signGroup.add(signHeader);
+
+      this.groundGroup.add(signGroup);
       this.interactiveMeshes.push(signBoard);
     }
   }
 
-  private createTree(x: number, y: number, z: number) {
-    const treeGroup = new THREE.Group();
-    treeGroup.position.set(x, y, z);
+  private createSurveyorStake(x: number, y: number, z: number) {
+    const stake = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.03, 0.04, 0.7, 6),
+      new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.8 })
+    );
+    stake.position.set(x + 0.4, y + 0.35, z + 0.4);
+    stake.castShadow = true;
+    this.groundGroup.add(stake);
 
+    const flag = new THREE.Mesh(
+      new THREE.BoxGeometry(0.2, 0.12, 0.02),
+      new THREE.MeshStandardMaterial({ color: 0xf97316, roughness: 0.3 })
+    );
+    flag.position.set(x + 0.5, y + 0.65, z + 0.4);
+    this.groundGroup.add(flag);
+  }
+
+  private createGardenFeatures(x: number, y: number, z: number) {
+    const group = new THREE.Group();
+    group.position.set(x, y, z);
+
+    // Stone pathway slab
+    const stone = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.45, 0.5, 0.06, 8),
+      new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.7 })
+    );
+    stone.position.set(0, 0.03, 0);
+    group.add(stone);
+
+    // Tree
     const trunk = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.12, 0.16, 0.9, 6),
-      new THREE.MeshStandardMaterial({ color: 0x6e4a28, roughness: 0.9 })
+      new THREE.CylinderGeometry(0.12, 0.18, 1.1, 6),
+      new THREE.MeshStandardMaterial({ color: 0x5a3e2b, roughness: 0.9 })
     );
-    trunk.position.y = 0.45;
+    trunk.position.set(0.3, 0.55, 0.3);
     trunk.castShadow = true;
-    treeGroup.add(trunk);
+    group.add(trunk);
 
-    const sphere1 = new THREE.Mesh(
-      new THREE.SphereGeometry(0.65, 8, 6),
-      new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.8 })
+    const foliage = new THREE.Mesh(
+      new THREE.SphereGeometry(0.72, 8, 6),
+      new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.8 })
     );
-    sphere1.position.y = 1.15;
-    sphere1.castShadow = true;
-    treeGroup.add(sphere1);
+    foliage.position.set(0.3, 1.45, 0.3);
+    foliage.castShadow = true;
+    group.add(foliage);
 
-    const sphere2 = new THREE.Mesh(
-      new THREE.SphereGeometry(0.48, 8, 6),
-      new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.8 })
+    // Flowerbed with colorful blooms
+    const flowerbed = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.35, 0.4, 0.12, 8),
+      new THREE.MeshStandardMaterial({ color: 0x3f2e1e, roughness: 0.95 })
     );
-    sphere2.position.y = 1.6;
-    sphere2.castShadow = true;
-    treeGroup.add(sphere2);
+    flowerbed.position.set(-0.4, 0.06, -0.4);
+    group.add(flowerbed);
 
-    this.groundGroup.add(treeGroup);
+    for (let f = 0; f < 4; f++) {
+      const bloom = new THREE.Mesh(
+        new THREE.SphereGeometry(0.08, 6, 4),
+        new THREE.MeshBasicMaterial({ color: f % 2 === 0 ? 0xf43f5e : 0xfbbf24 })
+      );
+      const ang = (f * Math.PI) / 2;
+      bloom.position.set(-0.4 + Math.cos(ang) * 0.18, 0.18, -0.4 + Math.sin(ang) * 0.18);
+      group.add(bloom);
+    }
+
+    this.groundGroup.add(group);
   }
 
   // ------------------------------------------
-  // CORRIDORS & LOGISTICS CONDUITS
+  // ------------------------------------------
+  // 3. PRISTINE SANITARY CORRIDORS (AUTO-TILING & ADAPTIVE DIRECTION)
   // ------------------------------------------
   private buildCorridors(game: Game) {
-    const corridorMat = new THREE.MeshStandardMaterial({ color: 0xf0ebe1, roughness: 0.3, metalness: 0.1 });
-    const conduitGlowMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
+    const floorMat = new THREE.MeshStandardMaterial({
+      color: 0xf8fafc,
+      roughness: 0.15,
+      metalness: 0.12,
+    });
+    const agvTrackMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
+    const hubMat = new THREE.MeshBasicMaterial({ color: 0x34d399 });
+    const bumperMat = new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.85, roughness: 0.2 });
+
+    // Check if an adjacent tile connects to this corridor
+    const isConnected = (nc: number, nr: number) => {
+      if (nc < 0 || nc >= COLS || nr < 0 || nr >= ROWS) return false;
+      const t = game.tiles[nr]?.[nc];
+      if (!t) return false;
+      return Boolean(t.corridor || t.roomId);
+    };
 
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
@@ -678,20 +1256,99 @@ export class ThreeCampus {
         const posX = (c - COLS / 2 + 0.5) * TILE_SIZE;
         const posZ = (r - ROWS / 2 + 0.5) * TILE_SIZE;
 
-        const walkFloor = new THREE.Mesh(new THREE.BoxGeometry(TILE_SIZE * 0.9, 0.14, TILE_SIZE * 0.9), corridorMat);
-        walkFloor.position.set(posX, 0.07, posZ);
+        // Cleanroom high-gloss terrazzo floor
+        const walkFloor = new THREE.Mesh(new THREE.BoxGeometry(TILE_SIZE * 0.98, 0.16, TILE_SIZE * 0.98), floorMat);
+        walkFloor.position.set(posX, 0.08, posZ);
         walkFloor.receiveShadow = true;
         this.corridorsGroup.add(walkFloor);
 
-        const conduit = new THREE.Mesh(new THREE.BoxGeometry(TILE_SIZE * 0.22, 0.16, TILE_SIZE * 0.9), conduitGlowMat);
-        conduit.position.set(posX, 0.08, posZ);
-        this.corridorsGroup.add(conduit);
+        // Check 4 orthogonal neighbor connections
+        const hasN = isConnected(c, r - 1);
+        const hasS = isConnected(c, r + 1);
+        const hasE = isConnected(c + 1, r);
+        const hasW = isConnected(c - 1, r);
+        const connCount = (hasN ? 1 : 0) + (hasS ? 1 : 0) + (hasE ? 1 : 0) + (hasW ? 1 : 0);
+
+        // --- PROTECTIVE STAINLESS STEEL PERIMETER BUMPERS ---
+        // Only placed on closed sides that do NOT connect to corridors or rooms!
+        const curbThick = 0.05;
+        const curbHeight = 0.06;
+        const curbY = 0.12;
+
+        if (!hasN) {
+          const trimN = new THREE.Mesh(new THREE.BoxGeometry(TILE_SIZE * 0.98, curbHeight, curbThick), bumperMat);
+          trimN.position.set(posX, curbY, posZ - TILE_SIZE * 0.465);
+          this.corridorsGroup.add(trimN);
+        }
+        if (!hasS) {
+          const trimS = new THREE.Mesh(new THREE.BoxGeometry(TILE_SIZE * 0.98, curbHeight, curbThick), bumperMat);
+          trimS.position.set(posX, curbY, posZ + TILE_SIZE * 0.465);
+          this.corridorsGroup.add(trimS);
+        }
+        if (!hasW) {
+          const trimW = new THREE.Mesh(new THREE.BoxGeometry(curbThick, curbHeight, TILE_SIZE * 0.98), bumperMat);
+          trimW.position.set(posX - TILE_SIZE * 0.465, curbY, posZ);
+          this.corridorsGroup.add(trimW);
+        }
+        if (!hasE) {
+          const trimE = new THREE.Mesh(new THREE.BoxGeometry(curbThick, curbHeight, TILE_SIZE * 0.98), bumperMat);
+          trimE.position.set(posX + TILE_SIZE * 0.465, curbY, posZ);
+          this.corridorsGroup.add(trimE);
+        }
+
+        // --- INTELLIGENT AGV LOGISTICS GUIDE NAVIGATION TRACKS ---
+        const trackWidth = 0.22;
+        const trackY = 0.165;
+
+        // Center hub
+        const centerHub = new THREE.Mesh(new THREE.BoxGeometry(trackWidth, 0.015, trackWidth), agvTrackMat);
+        centerHub.position.set(posX, trackY, posZ);
+        this.corridorsGroup.add(centerHub);
+
+        // If isolated tile (0 connections) or standard single orientation, default straight North-South
+        if (connCount === 0) {
+          const trackAlone = new THREE.Mesh(new THREE.BoxGeometry(trackWidth, 0.015, TILE_SIZE * 0.9), agvTrackMat);
+          trackAlone.position.set(posX, trackY, posZ);
+          this.corridorsGroup.add(trackAlone);
+        } else {
+          // North branch
+          if (hasN) {
+            const trackN = new THREE.Mesh(new THREE.BoxGeometry(trackWidth, 0.015, TILE_SIZE * 0.5), agvTrackMat);
+            trackN.position.set(posX, trackY, posZ - TILE_SIZE * 0.25);
+            this.corridorsGroup.add(trackN);
+          }
+          // South branch
+          if (hasS) {
+            const trackS = new THREE.Mesh(new THREE.BoxGeometry(trackWidth, 0.015, TILE_SIZE * 0.5), agvTrackMat);
+            trackS.position.set(posX, trackY, posZ + TILE_SIZE * 0.25);
+            this.corridorsGroup.add(trackS);
+          }
+          // East branch
+          if (hasE) {
+            const trackE = new THREE.Mesh(new THREE.BoxGeometry(TILE_SIZE * 0.5, 0.015, trackWidth), agvTrackMat);
+            trackE.position.set(posX + TILE_SIZE * 0.25, trackY, posZ);
+            this.corridorsGroup.add(trackE);
+          }
+          // West branch
+          if (hasW) {
+            const trackW = new THREE.Mesh(new THREE.BoxGeometry(TILE_SIZE * 0.5, 0.015, trackWidth), agvTrackMat);
+            trackW.position.set(posX - TILE_SIZE * 0.25, trackY, posZ);
+            this.corridorsGroup.add(trackW);
+          }
+
+          // Intersection Hub Node for 3-way or 4-way junctions
+          if (connCount >= 3) {
+            const hubNode = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.02, 16), hubMat);
+            hubNode.position.set(posX, trackY + 0.005, posZ);
+            this.corridorsGroup.add(hubNode);
+          }
+        }
       }
     }
   }
 
   // ------------------------------------------
-  // CLEANROOM BUILDINGS & DETAILED CUTAWAYS
+  // 4. CLEANROOM BUILDINGS & ADVANCED ARCHITECTURE
   // ------------------------------------------
   private buildRooms(game: Game) {
     const power = powerReport(game);
@@ -731,6 +1388,78 @@ export class ThreeCampus {
     });
   }
 
+  // Helper to determine the single smartest door location for a room based on adjacent corridors
+  private findSmartRoomDoor(room: Room, game: Game): { wall: "S" | "E" | "W" | "N"; relX: number; relZ: number; rotY: number } {
+    const roomW = room.w * TILE_SIZE;
+    const roomD = room.h * TILE_SIZE;
+    const roomCenterX = (room.c + room.w / 2 - COLS / 2) * TILE_SIZE;
+    const roomCenterZ = (room.r + room.h / 2 - ROWS / 2) * TILE_SIZE;
+
+    // 1. Check South perimeter (preferred primary entrance facing camera)
+    for (let c = room.c; c < room.c + room.w; c++) {
+      const tile = game.tiles[room.r + room.h]?.[c];
+      if (tile?.corridor) {
+        const tileWorldX = (c + 0.5 - COLS / 2) * TILE_SIZE;
+        return {
+          wall: "S",
+          relX: tileWorldX - roomCenterX,
+          relZ: roomD / 2 - 0.08,
+          rotY: 0,
+        };
+      }
+    }
+
+    // 2. Check East perimeter
+    for (let r = room.r; r < room.r + room.h; r++) {
+      const tile = game.tiles[r]?.[room.c + room.w];
+      if (tile?.corridor) {
+        const tileWorldZ = (r + 0.5 - ROWS / 2) * TILE_SIZE;
+        return {
+          wall: "E",
+          relX: roomW / 2 - 0.08,
+          relZ: tileWorldZ - roomCenterZ,
+          rotY: -Math.PI / 2,
+        };
+      }
+    }
+
+    // 3. Check West perimeter
+    for (let r = room.r; r < room.r + room.h; r++) {
+      const tile = game.tiles[r]?.[room.c - 1];
+      if (tile?.corridor) {
+        const tileWorldZ = (r + 0.5 - ROWS / 2) * TILE_SIZE;
+        return {
+          wall: "W",
+          relX: -roomW / 2 + 0.08,
+          relZ: tileWorldZ - roomCenterZ,
+          rotY: Math.PI / 2,
+        };
+      }
+    }
+
+    // 4. Check North perimeter
+    for (let c = room.c; c < room.c + room.w; c++) {
+      const tile = game.tiles[room.r - 1]?.[c];
+      if (tile?.corridor) {
+        const tileWorldX = (c + 0.5 - COLS / 2) * TILE_SIZE;
+        return {
+          wall: "N",
+          relX: tileWorldX - roomCenterX,
+          relZ: -roomD / 2 + 0.08,
+          rotY: Math.PI,
+        };
+      }
+    }
+
+    // 5. Default fallback if no corridor touches room: center of South wall
+    return {
+      wall: "S",
+      relX: 0,
+      relZ: roomD / 2 - 0.08,
+      rotY: 0,
+    };
+  }
+
   private buildSingleRoom(game: Game, room: Room, unpoweredList: { roomId: string; index: number }[]) {
     const theme = ROOM_THEMES[room.type] || ROOM_THEMES.pilot;
     const online = roomOnline(game, room);
@@ -745,8 +1474,11 @@ export class ThreeCampus {
     roomRoot.position.set(posX, 0, posZ);
     roomRoot.userData = { type: "room", roomId: room.id };
 
+    // Find the single smart doorway location connecting to corridors
+    const smartDoor = this.findSmartRoomDoor(room, game);
+
     // 1. FLOOR COLOR BASED ON OVERLAY MODE
-    let floorColor = online ? theme.floor : 0x8a9e97;
+    let floorColor = online ? theme.floor : 0x94a3b8;
     let emissiveColor = 0x000000;
     let emissiveInt = 0;
 
@@ -767,13 +1499,14 @@ export class ThreeCampus {
       emissiveInt = 0.3;
     }
 
+    // High-gloss Cleanroom Floor Slab with subtle beveled border
     const floorGeo = new THREE.BoxGeometry(roomW * 0.98, 0.16, roomD * 0.98);
     const floorMat = new THREE.MeshStandardMaterial({
       color: floorColor,
       emissive: emissiveColor,
       emissiveIntensity: emissiveInt,
-      roughness: 0.16,
-      metalness: 0.14,
+      roughness: 0.15,
+      metalness: 0.1,
     });
     const floorMesh = new THREE.Mesh(floorGeo, floorMat);
     floorMesh.position.y = 0.08;
@@ -782,103 +1515,381 @@ export class ThreeCampus {
     roomRoot.add(floorMesh);
     this.interactiveMeshes.push(floorMesh);
 
-    // Hazard perimeter floor markings
+    // Hazard / Dock Perimeter Warning Strip
     if (theme.motif === "hazard" || theme.motif === "dock") {
-      const hazardTape = new THREE.Mesh(
-        new THREE.BoxGeometry(roomW * 0.99, 0.17, roomD * 0.99),
-        new THREE.MeshStandardMaterial({ color: theme.trim, roughness: 0.4 })
-      );
-      hazardTape.position.y = 0.075;
-      roomRoot.add(hazardTape);
+      const borderMat = new THREE.MeshBasicMaterial({ color: theme.trim });
+      const border1 = new THREE.Mesh(new THREE.BoxGeometry(roomW * 0.96, 0.02, 0.08), borderMat);
+      border1.position.set(0, 0.165, roomD * 0.44);
+      roomRoot.add(border1);
+      const border2 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.02, roomD * 0.96), borderMat);
+      border2.position.set(roomW * 0.44, 0.165, 0);
+      roomRoot.add(border2);
     }
 
-    // 2. ARCHITECTURAL CUTAWAY WALLS & ROOM LEVELS (1 -> 2 -> 3)
-    const wallHeight = 1.3 + (room.level - 1) * 0.4;
+    // 2. CLEANROOM ARCHITECTURAL SANDWICH PANELS & VIEWING WINDOWS
+    const wallHeight = 1.35 + (room.level - 1) * 0.4;
     const wallThick = 0.16;
 
-    const wallMat = new THREE.MeshStandardMaterial({
-      color: online ? theme.wall : 0x3d4e48,
-      roughness: 0.35,
-      metalness: 0.3,
+    // Pristine Sterile White-Grey Sandwich Panel Material
+    const panelMat = new THREE.MeshStandardMaterial({
+      color: 0xf8fafc,
+      roughness: 0.25,
+      metalness: 0.08,
     });
 
-    const glassMat = new THREE.MeshPhysicalMaterial({
-      color: 0x93c5fd,
-      transmission: 0.85,
+    // Top aluminum coping cap
+    const capMat = new THREE.MeshStandardMaterial({
+      color: 0xcfd8dc,
+      metalness: 0.8,
+      roughness: 0.2,
+    });
+
+    // Department Accent Baseboard Sanitary Coving
+    const covingMat = new THREE.MeshStandardMaterial({
+      color: theme.accent,
+      roughness: 0.3,
+      metalness: 0.15,
+    });
+
+    // Stainless steel protective dual bumper rails
+    const bumperMat = new THREE.MeshStandardMaterial({
+      color: 0x94a3b8,
+      metalness: 0.85,
+      roughness: 0.15,
+    });
+
+    // Double-glazed Flush Viewing Glass
+    const windowGlassMat = new THREE.MeshPhysicalMaterial({
+      color: 0xcffafe,
+      transmission: 0.86,
       opacity: 1,
       transparent: true,
-      roughness: 0.08,
+      roughness: 0.06,
       ior: 1.45,
     });
 
-    // Rear wall (North, Z-)
-    const northWall = new THREE.Mesh(new THREE.BoxGeometry(roomW, wallHeight, wallThick), wallMat);
-    northWall.position.set(0, wallHeight / 2 + 0.16, -roomD / 2 + wallThick / 2);
-    northWall.castShadow = true;
-    northWall.receiveShadow = true;
-    roomRoot.add(northWall);
+    // Overhead Cleanroom Recessed LED Troffer Light (illumination glow)
+    const ledMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      emissive: 0xffffff,
+      emissiveIntensity: online ? 0.95 : 0.15,
+      roughness: 0.1,
+    });
 
-    // Rear side wall (West, X-)
-    const westWall = new THREE.Mesh(new THREE.BoxGeometry(wallThick, wallHeight, roomD), wallMat);
-    westWall.position.set(-roomW / 2 + wallThick / 2, wallHeight / 2 + 0.16, 0);
-    westWall.castShadow = true;
-    westWall.receiveShadow = true;
-    roomRoot.add(westWall);
+    // --- NORTH WALL (REAR, Z-) ---
+    const northGroup = new THREE.Group();
+    northGroup.position.set(0, 0.16, -roomD / 2 + wallThick / 2);
 
-    // Front Low Baseboards
-    const curbHeight = 0.28;
-    const southCurb = new THREE.Mesh(new THREE.BoxGeometry(roomW * 0.72, curbHeight, wallThick), wallMat);
-    southCurb.position.set(-roomW * 0.12, curbHeight / 2 + 0.16, roomD / 2 - wallThick / 2);
-    roomRoot.add(southCurb);
+    // North lower wall panel (0 to 0.55m)
+    const northLower = new THREE.Mesh(new THREE.BoxGeometry(roomW, 0.55, wallThick), panelMat);
+    northLower.position.y = 0.275;
+    northLower.castShadow = true;
+    northLower.receiveShadow = true;
+    northGroup.add(northLower);
 
-    const eastCurb = new THREE.Mesh(new THREE.BoxGeometry(wallThick, curbHeight, roomD * 0.72), wallMat);
-    eastCurb.position.set(roomW / 2 - wallThick / 2, curbHeight / 2 + 0.16, -roomD * 0.12);
-    roomRoot.add(eastCurb);
+    // North baseboard sanitary coving
+    const northCove = new THREE.Mesh(new THREE.BoxGeometry(roomW, 0.1, 0.04), covingMat);
+    northCove.position.set(0, 0.05, wallThick / 2 + 0.01);
+    northGroup.add(northCove);
 
-    // LEVEL 2 UPGRADES
-    if (room.level >= 2) {
-      const windowMesh = new THREE.Mesh(new THREE.BoxGeometry(roomW * 0.6, wallHeight * 0.45, 0.06), glassMat);
-      windowMesh.position.set(0, wallHeight * 0.6 + 0.16, -roomD / 2 + wallThick + 0.02);
-      roomRoot.add(windowMesh);
+    // North dual bumper rails
+    const northBumper1 = new THREE.Mesh(new THREE.BoxGeometry(roomW, 0.05, 0.04), bumperMat);
+    northBumper1.position.set(0, 0.26, wallThick / 2 + 0.01);
+    northGroup.add(northBumper1);
 
-      const bumperMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.8, roughness: 0.2 });
-      const bumperRail = new THREE.Mesh(new THREE.BoxGeometry(roomW * 0.9, 0.08, 0.06), bumperMat);
-      bumperRail.position.set(0, 0.45, -roomD / 2 + wallThick + 0.04);
-      roomRoot.add(bumperRail);
+    const northBumper2 = new THREE.Mesh(new THREE.BoxGeometry(roomW, 0.05, 0.04), bumperMat);
+    northBumper2.position.set(0, 0.44, wallThick / 2 + 0.01);
+    northGroup.add(northBumper2);
 
-      const hepaUnit = new THREE.Mesh(
-        new THREE.BoxGeometry(0.8, 0.12, 0.8),
-        new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.2 })
-      );
-      hepaUnit.position.set(0, wallHeight + 0.1, 0);
-      roomRoot.add(hepaUnit);
+    // North large viewing window (0.55 to 1.15m)
+    const northWindowW = roomW * 0.65;
+    const northWindowH = 0.58;
+    const northWindow = new THREE.Mesh(new THREE.BoxGeometry(northWindowW, northWindowH, 0.06), windowGlassMat);
+    northWindow.position.set(0, 0.55 + northWindowH / 2, 0);
+    northGroup.add(northWindow);
+
+    // North window frame (brushed aluminum)
+    const northFrameTop = new THREE.Mesh(new THREE.BoxGeometry(northWindowW + 0.1, 0.04, wallThick + 0.02), capMat);
+    northFrameTop.position.set(0, 0.55 + northWindowH + 0.02, 0);
+    northGroup.add(northFrameTop);
+
+    const northFrameBottom = new THREE.Mesh(new THREE.BoxGeometry(northWindowW + 0.1, 0.04, wallThick + 0.02), capMat);
+    northFrameBottom.position.set(0, 0.55 - 0.02, 0);
+    northGroup.add(northFrameBottom);
+
+    // North wall solid sides flanking window
+    const northSideW = (roomW - northWindowW) / 2;
+    if (northSideW > 0.05) {
+      const northSideL = new THREE.Mesh(new THREE.BoxGeometry(northSideW, northWindowH, wallThick), panelMat);
+      northSideL.position.set(-roomW / 2 + northSideW / 2, 0.55 + northWindowH / 2, 0);
+      northSideL.castShadow = true;
+      northGroup.add(northSideL);
+
+      const northSideR = new THREE.Mesh(new THREE.BoxGeometry(northSideW, northWindowH, wallThick), panelMat);
+      northSideR.position.set(roomW / 2 - northSideW / 2, 0.55 + northWindowH / 2, 0);
+      northSideR.castShadow = true;
+      northGroup.add(northSideR);
     }
 
-    // LEVEL 3 UPGRADES
-    if (room.level >= 3) {
-      const steelMat = new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.85, roughness: 0.2 });
+    // North upper lintel panel (above window to wallHeight)
+    const northUpperH = Math.max(0.15, wallHeight - (0.55 + northWindowH));
+    const northUpper = new THREE.Mesh(new THREE.BoxGeometry(roomW, northUpperH, wallThick), panelMat);
+    northUpper.position.set(0, 0.55 + northWindowH + northUpperH / 2, 0);
+    northUpper.castShadow = true;
+    northGroup.add(northUpper);
 
-      const catwalk = new THREE.Mesh(new THREE.BoxGeometry(roomW * 0.85, 0.08, 0.45), steelMat);
+    // North top aluminum coping cap
+    const northCap = new THREE.Mesh(new THREE.BoxGeometry(roomW + 0.04, 0.06, wallThick + 0.04), capMat);
+    northCap.position.set(0, wallHeight + 0.03, 0);
+    northGroup.add(northCap);
+
+    // North overhead cleanroom LED troffer strip
+    const northLed = new THREE.Mesh(new THREE.BoxGeometry(roomW * 0.85, 0.04, 0.18), ledMat);
+    northLed.position.set(0, wallHeight - 0.04, wallThick / 2 + 0.09);
+    northGroup.add(northLed);
+
+    roomRoot.add(northGroup);
+
+    // --- WEST WALL (REAR SIDE, X-) ---
+    const westGroup = new THREE.Group();
+    westGroup.position.set(-roomW / 2 + wallThick / 2, 0.16, 0);
+
+    // West lower wall panel (0 to 0.55m)
+    const westLower = new THREE.Mesh(new THREE.BoxGeometry(wallThick, 0.55, roomD), panelMat);
+    westLower.position.y = 0.275;
+    westLower.castShadow = true;
+    westLower.receiveShadow = true;
+    westGroup.add(westLower);
+
+    // West baseboard sanitary coving
+    const westCove = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.1, roomD), covingMat);
+    westCove.position.set(wallThick / 2 + 0.01, 0.05, 0);
+    westGroup.add(westCove);
+
+    // West dual bumper rails
+    const westBumper1 = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.05, roomD), bumperMat);
+    westBumper1.position.set(wallThick / 2 + 0.01, 0.26, 0);
+    westGroup.add(westBumper1);
+
+    const westBumper2 = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.05, roomD), bumperMat);
+    westBumper2.position.set(wallThick / 2 + 0.01, 0.44, 0);
+    westGroup.add(westBumper2);
+
+    // West viewing window
+    const westWindowD = roomD * 0.65;
+    const westWindowH = 0.58;
+    const westWindow = new THREE.Mesh(new THREE.BoxGeometry(0.06, westWindowH, westWindowD), windowGlassMat);
+    westWindow.position.set(0, 0.55 + westWindowH / 2, 0);
+    westGroup.add(westWindow);
+
+    // West window frame
+    const westFrameTop = new THREE.Mesh(new THREE.BoxGeometry(wallThick + 0.02, 0.04, westWindowD + 0.1), capMat);
+    westFrameTop.position.set(0, 0.55 + westWindowH + 0.02, 0);
+    westGroup.add(westFrameTop);
+
+    const westFrameBottom = new THREE.Mesh(new THREE.BoxGeometry(wallThick + 0.02, 0.04, westWindowD + 0.1), capMat);
+    westFrameBottom.position.set(0, 0.55 - 0.02, 0);
+    westGroup.add(westFrameBottom);
+
+    const westSideD = (roomD - westWindowD) / 2;
+    if (westSideD > 0.05) {
+      const westSideBack = new THREE.Mesh(new THREE.BoxGeometry(wallThick, westWindowH, westSideD), panelMat);
+      westSideBack.position.set(0, 0.55 + westWindowH / 2, -roomD / 2 + westSideD / 2);
+      westSideBack.castShadow = true;
+      westGroup.add(westSideBack);
+
+      const westSideFront = new THREE.Mesh(new THREE.BoxGeometry(wallThick, westWindowH, westSideD), panelMat);
+      westSideFront.position.set(0, 0.55 + westWindowH / 2, roomD / 2 - westSideD / 2);
+      westSideFront.castShadow = true;
+      westGroup.add(westSideFront);
+    }
+
+    const westUpperH = Math.max(0.15, wallHeight - (0.55 + westWindowH));
+    const westUpper = new THREE.Mesh(new THREE.BoxGeometry(wallThick, westUpperH, roomD), panelMat);
+    westUpper.position.set(0, 0.55 + westWindowH + westUpperH / 2, 0);
+    westUpper.castShadow = true;
+    westGroup.add(westUpper);
+
+    // West top aluminum coping cap
+    const westCap = new THREE.Mesh(new THREE.BoxGeometry(wallThick + 0.04, 0.06, roomD + 0.04), capMat);
+    westCap.position.set(0, wallHeight + 0.03, 0);
+    westGroup.add(westCap);
+
+    // West overhead cleanroom LED troffer strip
+    const westLed = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.04, roomD * 0.85), ledMat);
+    westLed.position.set(wallThick / 2 + 0.09, wallHeight - 0.04, 0);
+    westGroup.add(westLed);
+
+    roomRoot.add(westGroup);
+
+    // --- FRONT LOW SANITARY CURBS (South & East) ADAPTED TO DOOR OPENING ---
+    const curbHeight = 0.22;
+    const doorGapWidth = 1.3;
+
+    // Build South curb (with doorway opening if door is on South)
+    if (smartDoor.wall === "S") {
+      // Left segment of South curb
+      const leftW = Math.max(0.1, smartDoor.relX - (-roomW / 2) - doorGapWidth / 2);
+      if (leftW > 0.15) {
+        const curbSLeft = new THREE.Mesh(new THREE.BoxGeometry(leftW, curbHeight, wallThick), panelMat);
+        curbSLeft.position.set(-roomW / 2 + leftW / 2, curbHeight / 2 + 0.16, roomD / 2 - wallThick / 2);
+        curbSLeft.castShadow = true;
+        roomRoot.add(curbSLeft);
+
+        const capSLeft = new THREE.Mesh(new THREE.BoxGeometry(leftW, 0.04, wallThick + 0.02), capMat);
+        capSLeft.position.set(-roomW / 2 + leftW / 2, curbHeight + 0.18, roomD / 2 - wallThick / 2);
+        roomRoot.add(capSLeft);
+      }
+      // Right segment of South curb
+      const rightW = Math.max(0.1, roomW / 2 - (smartDoor.relX + doorGapWidth / 2));
+      if (rightW > 0.15) {
+        const curbSRight = new THREE.Mesh(new THREE.BoxGeometry(rightW, curbHeight, wallThick), panelMat);
+        curbSRight.position.set(roomW / 2 - rightW / 2, curbHeight / 2 + 0.16, roomD / 2 - wallThick / 2);
+        curbSRight.castShadow = true;
+        roomRoot.add(curbSRight);
+
+        const capSRight = new THREE.Mesh(new THREE.BoxGeometry(rightW, 0.04, wallThick + 0.02), capMat);
+        capSRight.position.set(roomW / 2 - rightW / 2, curbHeight + 0.18, roomD / 2 - wallThick / 2);
+        roomRoot.add(capSRight);
+      }
+    } else {
+      // Solid South curb
+      const southCurb = new THREE.Mesh(new THREE.BoxGeometry(roomW * 0.75, curbHeight, wallThick), panelMat);
+      southCurb.position.set(-roomW * 0.1, curbHeight / 2 + 0.16, roomD / 2 - wallThick / 2);
+      southCurb.castShadow = true;
+      roomRoot.add(southCurb);
+
+      const southCap = new THREE.Mesh(new THREE.BoxGeometry(roomW * 0.75, 0.04, wallThick + 0.02), capMat);
+      southCap.position.set(-roomW * 0.1, curbHeight + 0.18, roomD / 2 - wallThick / 2);
+      roomRoot.add(southCap);
+    }
+
+    // Build East curb (with doorway opening if door is on East)
+    if (smartDoor.wall === "E") {
+      // Back segment of East curb
+      const backD = Math.max(0.1, smartDoor.relZ - (-roomD / 2) - doorGapWidth / 2);
+      if (backD > 0.15) {
+        const curbEBack = new THREE.Mesh(new THREE.BoxGeometry(wallThick, curbHeight, backD), panelMat);
+        curbEBack.position.set(roomW / 2 - wallThick / 2, curbHeight / 2 + 0.16, -roomD / 2 + backD / 2);
+        curbEBack.castShadow = true;
+        roomRoot.add(curbEBack);
+
+        const capEBack = new THREE.Mesh(new THREE.BoxGeometry(wallThick + 0.02, 0.04, backD), capMat);
+        capEBack.position.set(roomW / 2 - wallThick / 2, curbHeight + 0.18, -roomD / 2 + backD / 2);
+        roomRoot.add(capEBack);
+      }
+      // Front segment of East curb
+      const frontD = Math.max(0.1, roomD / 2 - (smartDoor.relZ + doorGapWidth / 2));
+      if (frontD > 0.15) {
+        const curbEFront = new THREE.Mesh(new THREE.BoxGeometry(wallThick, curbHeight, frontD), panelMat);
+        curbEFront.position.set(roomW / 2 - wallThick / 2, curbHeight / 2 + 0.16, roomD / 2 - frontD / 2);
+        curbEFront.castShadow = true;
+        roomRoot.add(curbEFront);
+
+        const capEFront = new THREE.Mesh(new THREE.BoxGeometry(wallThick + 0.02, 0.04, frontD), capMat);
+        capEFront.position.set(roomW / 2 - wallThick / 2, curbHeight + 0.18, roomD / 2 - frontD / 2);
+        roomRoot.add(capEFront);
+      }
+    } else {
+      // Solid East curb
+      const eastCurb = new THREE.Mesh(new THREE.BoxGeometry(wallThick, curbHeight, roomD * 0.75), panelMat);
+      eastCurb.position.set(roomW / 2 - wallThick / 2, curbHeight / 2 + 0.16, -roomD * 0.1);
+      eastCurb.castShadow = true;
+      roomRoot.add(eastCurb);
+
+      const eastCap = new THREE.Mesh(new THREE.BoxGeometry(wallThick + 0.02, 0.04, roomD * 0.75), capMat);
+      eastCap.position.set(roomW / 2 - wallThick / 2, curbHeight + 0.18, -roomD * 0.1);
+      roomRoot.add(eastCap);
+    }
+
+    // --- 3. DYNAMIC AIRLOCK ENTRANCE PORTAL & DECONTAMINATION STICKY MAT ---
+    // Placed exactly on the selected smart connecting edge facing the corridor!
+    this.createAirlockDoorPortal(
+      roomRoot,
+      smartDoor.relX,
+      smartDoor.relZ,
+      smartDoor.rotY,
+      theme,
+      online
+    );
+
+    // --- 4. BUILT-IN LAB CASEWORK & ENVIRONMENTAL TELEMETRY ---
+    const benchW = Math.min(1.4, roomW * 0.45);
+    const benchH = 0.46;
+    const benchD = 0.38;
+    const benchX = -roomW * 0.22;
+    const benchZ = -roomD / 2 + wallThick + benchD / 2 + 0.02;
+
+    const benchBody = new THREE.Mesh(
+      new THREE.BoxGeometry(benchW, benchH, benchD),
+      new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.25, metalness: 0.85 })
+    );
+    benchBody.position.set(benchX, 0.16 + benchH / 2, benchZ);
+    benchBody.castShadow = true;
+    benchBody.receiveShadow = true;
+    roomRoot.add(benchBody);
+
+    const benchTop = new THREE.Mesh(
+      new THREE.BoxGeometry(benchW + 0.04, 0.04, benchD + 0.04),
+      new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.15, metalness: 0.9 })
+    );
+    benchTop.position.set(benchX, 0.16 + benchH + 0.02, benchZ);
+    roomRoot.add(benchTop);
+
+    const emsDisplay = new THREE.Mesh(
+      new THREE.BoxGeometry(0.35, 0.24, 0.04),
+      new THREE.MeshStandardMaterial({
+        color: 0x0284c7,
+        emissive: 0x0284c7,
+        emissiveIntensity: online ? 0.75 : 0.1,
+        roughness: 0.2,
+      })
+    );
+    emsDisplay.position.set(benchX, 0.16 + benchH + 0.32, -roomD / 2 + wallThick + 0.03);
+    roomRoot.add(emsDisplay);
+
+    // --- 5. LEVEL 2 & LEVEL 3 EXPANSION ARCHITECTURE ---
+    if (room.level >= 2) {
+      const hepa = new THREE.Mesh(
+        new THREE.BoxGeometry(0.95, 0.14, 0.95),
+        new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.25 })
+      );
+      hepa.position.set(0, wallHeight + 0.08, 0);
+      roomRoot.add(hepa);
+
+      const pipe = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.04, 0.04, roomD * 0.8, 8),
+        new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9, roughness: 0.1 })
+      );
+      pipe.rotation.x = Math.PI / 2;
+      pipe.position.set(-roomW / 2 + wallThick + 0.06, wallHeight - 0.12, 0);
+      roomRoot.add(pipe);
+    }
+
+    if (room.level >= 3) {
+      const catwalk = new THREE.Mesh(
+        new THREE.BoxGeometry(roomW * 0.85, 0.06, 0.45),
+        new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.85, roughness: 0.3 })
+      );
       catwalk.position.set(0, wallHeight - 0.05, -roomD / 2 + 0.45);
       roomRoot.add(catwalk);
 
-      const railing = new THREE.Mesh(new THREE.BoxGeometry(roomW * 0.85, 0.35, 0.04), steelMat);
-      railing.position.set(0, wallHeight + 0.15, -roomD / 2 + 0.65);
-      roomRoot.add(railing);
+      const rail = new THREE.Mesh(
+        new THREE.BoxGeometry(roomW * 0.85, 0.35, 0.03),
+        new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.3 })
+      );
+      rail.position.set(0, wallHeight + 0.15, -roomD / 2 + 0.65);
+      roomRoot.add(rail);
 
-      const ladder = new THREE.Mesh(new THREE.BoxGeometry(0.24, wallHeight, 0.04), steelMat);
+      const ladder = new THREE.Mesh(
+        new THREE.BoxGeometry(0.24, wallHeight, 0.04),
+        new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.8 })
+      );
       ladder.position.set(-roomW / 2 + 0.35, wallHeight / 2 + 0.16, -roomD / 2 + 0.25);
       roomRoot.add(ladder);
-
-      const statusScreen = new THREE.Mesh(
-        new THREE.PlaneGeometry(0.85, 0.28),
-        new THREE.MeshBasicMaterial({ color: online ? 0x10b981 : 0xef4444 })
-      );
-      statusScreen.position.set(0, wallHeight * 0.85 + 0.16, -roomD / 2 + wallThick + 0.02);
-      roomRoot.add(statusScreen);
     }
 
-    // 3. ALL 56 EQUIPMENT IN SLOTS
+    // 6. ALL EQUIPMENT IN SLOTS
     const anchors = anchorTiles(room);
     room.slots.forEach((slot, index) => {
       const tilePos = anchors[index];
@@ -888,7 +1899,7 @@ export class ThreeCampus {
       const slotWorldZ = (tilePos.r + 0.5 - ROWS / 2) * TILE_SIZE - posZ;
 
       if (!slot.item) {
-        this.createEmptySlotMarker(roomRoot, slotWorldX, 0.18, slotWorldZ);
+        this.createEmptySlotMarker(roomRoot, slotWorldX, 0.16, slotWorldZ);
       } else {
         const isGearOff = !online || room.halt > 0 || unpoweredList.some((h) => h.roomId === room.id && h.index === index);
         this.createDedicated3DProp(
@@ -904,7 +1915,7 @@ export class ThreeCampus {
       }
     });
 
-    // 4. ANIMATED STAFF AGENTS
+    // 7. ANIMATED STAFF AGENTS IN ROOM
     const crew = game.staff.filter((s) => s.roomId === room.id);
     crew.forEach((staffMember, index) => {
       const anchor = anchors[index % anchors.length];
@@ -926,7 +1937,7 @@ export class ThreeCampus {
       this.createAnimatedStaffAgent(staffMember.id, staffMember.role, room.id, roomRoot, hX, 0.16, hZ, patrolPoints);
     });
 
-    // 5. SELECTION HIGHLIGHT
+    // 8. SELECTION HIGHLIGHT
     if (isSelected) {
       const box = new THREE.BoxHelper(floorMesh, 0xf59e0b);
       roomRoot.add(box);
@@ -935,18 +1946,145 @@ export class ThreeCampus {
     this.buildingsGroup.add(roomRoot);
   }
 
+  private createAirlockDoorPortal(
+    parent: THREE.Group,
+    x: number,
+    z: number,
+    rotY: number,
+    theme: typeof ROOM_THEMES[keyof typeof ROOM_THEMES],
+    online: boolean
+  ) {
+    const portalGroup = new THREE.Group();
+    portalGroup.position.set(x, 0.16, z);
+    portalGroup.rotation.y = rotY;
+
+    const capMat = new THREE.MeshStandardMaterial({ color: 0xcfd8dc, metalness: 0.8, roughness: 0.2 });
+    const covingMat = new THREE.MeshStandardMaterial({ color: theme.accent, roughness: 0.3, metalness: 0.15 });
+
+    // 1. Blue Decontamination Sticky Mat (Dycem mat) placed just outside the doorway
+    const stickyMat = new THREE.Mesh(
+      new THREE.BoxGeometry(0.95, 0.015, 0.65),
+      new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.15, metalness: 0.2 })
+    );
+    stickyMat.position.set(0, 0.01, 0.35);
+    portalGroup.add(stickyMat);
+
+    // 2. Stainless Steel Door Jambs
+    const jamb1 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.3, 0.12), capMat);
+    jamb1.position.set(-0.55, 0.65, 0);
+    portalGroup.add(jamb1);
+
+    const jamb2 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.3, 0.12), capMat);
+    jamb2.position.set(0.55, 0.65, 0);
+    portalGroup.add(jamb2);
+
+    // 3. Sliding glass airlock doors (partially parted)
+    const glassDoorL = new THREE.Mesh(
+      new THREE.BoxGeometry(0.5, 1.22, 0.03),
+      new THREE.MeshPhysicalMaterial({ color: 0xcffafe, transmission: 0.85, transparent: true, roughness: 0.08 })
+    );
+    glassDoorL.position.set(-0.24, 0.63, 0);
+    portalGroup.add(glassDoorL);
+
+    const glassDoorR = glassDoorL.clone();
+    glassDoorR.position.set(0.24, 0.63, 0);
+    portalGroup.add(glassDoorR);
+
+    // 4. Header Sign Board with Department Accent
+    const headerBoard = new THREE.Mesh(new THREE.BoxGeometry(1.22, 0.26, 0.14), covingMat);
+    headerBoard.position.set(0, 1.35, 0);
+    headerBoard.castShadow = true;
+    portalGroup.add(headerBoard);
+
+    // 5. Cleanroom Classification Plaque (e.g., ISO 5, GMP A)
+    const badgeMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(0.96, 0.14, 0.16),
+      new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.3 })
+    );
+    badgeMesh.position.set(0, 1.35, 0);
+    portalGroup.add(badgeMesh);
+
+    // 6. Cleanroom Status LED Beacon (Green online, Red offline)
+    const beaconColor = online ? 0x10b981 : 0xef4444;
+    const beaconMesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.05, 0.05, 0.12, 12),
+      new THREE.MeshStandardMaterial({
+        color: beaconColor,
+        emissive: beaconColor,
+        emissiveIntensity: 0.85,
+        roughness: 0.2,
+      })
+    );
+    beaconMesh.position.set(0.42, 1.54, 0);
+    portalGroup.add(beaconMesh);
+    this.animatedEmissives.push({ mat: beaconMesh.material as THREE.MeshStandardMaterial, baseColor: beaconColor, speed: 3 });
+
+    parent.add(portalGroup);
+  }
+
   private createEmptySlotMarker(parent: THREE.Group, x: number, y: number, z: number) {
-    const ringGeo = new THREE.RingGeometry(0.35, 0.45, 16);
+    const slotGroup = new THREE.Group();
+    slotGroup.position.set(x, y, z);
+
+    // 1. Sleek metallic equipment mounting pad
+    const pad = new THREE.Mesh(
+      new THREE.BoxGeometry(0.92, 0.03, 0.92),
+      new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5, metalness: 0.6 })
+    );
+    pad.position.y = 0.015;
+    slotGroup.add(pad);
+
+    // 2. Stainless corner brackets with anchor bolts
+    const bracketMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9, roughness: 0.15 });
+    for (const bx of [-0.38, 0.38]) {
+      for (const bz of [-0.38, 0.38]) {
+        const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.04, 0.12), bracketMat);
+        bracket.position.set(bx, 0.035, bz);
+        slotGroup.add(bracket);
+      }
+    }
+
+    // 3. Glowing holographic circular platform ring
+    const ringGeo = new THREE.RingGeometry(0.24, 0.36, 20);
     const ringMat = new THREE.MeshBasicMaterial({
-      color: 0x10b981,
+      color: 0x06b6d4,
       side: THREE.DoubleSide,
       transparent: true,
-      opacity: 0.65,
+      opacity: 0.75,
     });
     const ring = new THREE.Mesh(ringGeo, ringMat);
     ring.rotation.x = -Math.PI / 2;
-    ring.position.set(x, y + 0.01, z);
-    parent.add(ring);
+    ring.position.y = 0.035;
+    slotGroup.add(ring);
+
+    // 4. Floating holographic diamond target beacon
+    const beaconGeo = new THREE.OctahedronGeometry(0.11, 0);
+    const beaconMat = new THREE.MeshStandardMaterial({
+      color: 0x22d3ee,
+      emissive: 0x06b6d4,
+      emissiveIntensity: 0.9,
+      roughness: 0.1,
+      transparent: true,
+      opacity: 0.85,
+    });
+    const beacon = new THREE.Mesh(beaconGeo, beaconMat);
+    beacon.position.y = 0.28;
+    slotGroup.add(beacon);
+    this.animatedSpinners.push({ mesh: beacon, speed: 2.5 });
+
+    // Subtle upward holographic light column
+    const beamGeo = new THREE.CylinderGeometry(0.24, 0.28, 0.26, 16, 1, true);
+    const beamMat = new THREE.MeshBasicMaterial({
+      color: 0x06b6d4,
+      transparent: true,
+      opacity: 0.15,
+      side: THREE.DoubleSide,
+    });
+    const beam = new THREE.Mesh(beamGeo, beamMat);
+    beam.position.y = 0.15;
+    slotGroup.add(beam);
+
+    parent.add(slotGroup);
   }
 
   // ==========================================
@@ -1277,43 +2415,165 @@ export class ThreeCampus {
     const group = new THREE.Group();
     group.position.set(x, y, z);
 
+    // Role-specific attire & accessories
     let suitColor = 0xffffff;
-    if (role === "operator") suitColor = 0x0284c7;
-    else if (role === "scientist") suitColor = 0x10b981;
-    else if (role === "qa") suitColor = 0xf59e0b;
-    else if (role === "clinical") suitColor = 0x6366f1;
-    else if (role === "regulatory") suitColor = 0x475569;
-    else if (role === "commercial") suitColor = 0x0f766e;
+    let gloveColor = 0x38bdf8;
+    let roleGemColor = 0x10b981;
+    let headCoverColor = 0x38bdf8; // hair or bouffant cleanroom cap
 
-    const suitMat = new THREE.MeshStandardMaterial({ color: suitColor, roughness: 0.5 });
+    if (role === "operator") {
+      suitColor = 0xf8fafc; // Cleanroom bunny suit jumpsuit
+      gloveColor = 0x0284c7; // Blue nitrile gloves
+      roleGemColor = 0x06b6d4; // Cyan gem
+      headCoverColor = 0xe2e8f0; // White hood
+    } else if (role === "scientist") {
+      suitColor = 0xffffff; // Crisp white lab coat
+      gloveColor = 0x10b981; // Green nitrile gloves
+      roleGemColor = 0x10b981; // Emerald gem
+      headCoverColor = 0x334155; // Dark hair
+    } else if (role === "qa") {
+      suitColor = 0xfef08a; // White coat with high-vis inspection vest
+      gloveColor = 0xf59e0b;
+      roleGemColor = 0xf59e0b; // Amber gem
+      headCoverColor = 0x1e293b;
+    } else if (role === "clinical") {
+      suitColor = 0x3b82f6; // Hospital blue scrubs
+      gloveColor = 0x60a5fa;
+      roleGemColor = 0x3b82f6;
+      headCoverColor = 0x1d4ed8;
+    } else if (role === "regulatory") {
+      suitColor = 0x1e293b; // Tailored charcoal executive suit
+      gloveColor = 0x475569;
+      roleGemColor = 0x8b5cf6;
+      headCoverColor = 0x475569;
+    } else if (role === "commercial") {
+      suitColor = 0x0f766e; // Modern teal corporate suit
+      gloveColor = 0x0d9488;
+      roleGemColor = 0x14b8a6;
+      headCoverColor = 0x78350f;
+    }
+
+    const suitMat = new THREE.MeshStandardMaterial({ color: suitColor, roughness: 0.45 });
     const limbMat = new THREE.MeshStandardMaterial({ color: suitColor, roughness: 0.5 });
-    const headMat = new THREE.MeshStandardMaterial({ color: 0xfde047, roughness: 0.4 });
+    const skinMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.4 });
+    const bootMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.6 });
+    const gloveMat = new THREE.MeshStandardMaterial({ color: gloveColor, roughness: 0.3 });
 
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.42, 8), suitMat);
-    body.position.y = 0.38;
+    // Torso with collar / lab coat cut
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.44, 8), suitMat);
+    body.position.y = 0.39;
     body.castShadow = true;
     group.add(body);
 
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), headMat);
-    head.position.y = 0.68;
+    // ID Badge lanyard on chest
+    const badge = new THREE.Mesh(
+      new THREE.BoxGeometry(0.06, 0.08, 0.02),
+      new THREE.MeshBasicMaterial({ color: 0x0284c7 })
+    );
+    badge.position.set(0.04, 0.46, 0.13);
+    group.add(badge);
+
+    // Head (skin tone)
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), skinMat);
+    head.position.y = 0.69;
     head.castShadow = true;
     group.add(head);
 
-    const leftLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.28, 6), limbMat);
-    leftLeg.position.set(-0.06, 0.14, 0);
-    group.add(leftLeg);
+    // Hair / Bouffant Cleanroom Cap
+    const hairCap = new THREE.Mesh(
+      new THREE.SphereGeometry(0.125, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2),
+      new THREE.MeshStandardMaterial({ color: headCoverColor, roughness: 0.6 })
+    );
+    hairCap.position.y = 0.70;
+    group.add(hairCap);
 
-    const rightLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.28, 6), limbMat);
-    rightLeg.position.set(0.06, 0.14, 0);
-    group.add(rightLeg);
+    // Safety Goggles Translucent Visor
+    const goggles = new THREE.Mesh(
+      new THREE.BoxGeometry(0.16, 0.05, 0.08),
+      new THREE.MeshPhysicalMaterial({ color: 0x38bdf8, transmission: 0.8, transparent: true, roughness: 0.1 })
+    );
+    goggles.position.set(0, 0.69, 0.09);
+    group.add(goggles);
 
+    // Legs with boots pivoting from the hip
+    const leftLegGroup = new THREE.Group();
+    leftLegGroup.position.set(-0.06, 0.26, 0);
+    const leftLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.26, 6), limbMat);
+    leftLeg.position.y = -0.13;
+    leftLegGroup.add(leftLeg);
+    const leftBoot = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.08, 0.13), bootMat);
+    leftBoot.position.set(0, -0.22, 0.02);
+    leftLegGroup.add(leftBoot);
+    group.add(leftLegGroup);
+
+    const rightLegGroup = new THREE.Group();
+    rightLegGroup.position.set(0.06, 0.26, 0);
+    const rightLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.26, 6), limbMat);
+    rightLeg.position.y = -0.13;
+    rightLegGroup.add(rightLeg);
+    const rightBoot = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.08, 0.13), bootMat);
+    rightBoot.position.set(0, -0.22, 0.02);
+    rightLegGroup.add(rightBoot);
+    group.add(rightLegGroup);
+
+    // Arms with gloves
     const leftArm = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.26, 6), limbMat);
     leftArm.position.set(-0.16, 0.4, 0);
     group.add(leftArm);
+    const leftGlove = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 6), gloveMat);
+    leftGlove.position.set(-0.16, 0.26, 0);
+    group.add(leftGlove);
 
     const rightArm = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.26, 6), limbMat);
     rightArm.position.set(0.16, 0.4, 0);
     group.add(rightArm);
+    const rightGlove = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 6), gloveMat);
+    rightGlove.position.set(0.16, 0.26, 0);
+    group.add(rightGlove);
+
+    // Held Prop: Tablet for Scientists / QA Clipboard / Commercial Briefcase
+    if (role === "scientist" || role === "clinical") {
+      const tablet = new THREE.Mesh(
+        new THREE.BoxGeometry(0.12, 0.16, 0.02),
+        new THREE.MeshStandardMaterial({
+          color: 0x0284c7,
+          emissive: 0x0284c7,
+          emissiveIntensity: 0.6,
+          roughness: 0.2,
+        })
+      );
+      tablet.position.set(0.14, 0.32, 0.12);
+      tablet.rotation.x = -Math.PI / 4;
+      group.add(tablet);
+    } else if (role === "qa" || role === "regulatory") {
+      const clipboard = new THREE.Mesh(
+        new THREE.BoxGeometry(0.12, 0.16, 0.02),
+        new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.4 })
+      );
+      clipboard.position.set(0.14, 0.32, 0.12);
+      clipboard.rotation.x = -Math.PI / 4;
+      group.add(clipboard);
+    } else if (role === "commercial") {
+      const briefcase = new THREE.Mesh(
+        new THREE.BoxGeometry(0.06, 0.14, 0.18),
+        new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.3 })
+      );
+      briefcase.position.set(0.22, 0.2, 0);
+      group.add(briefcase);
+    }
+
+    // Floating 3D Role Diamond / Gem above head (Two Point Hospital / Sims style!)
+    const roleGem = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.09, 0),
+      new THREE.MeshStandardMaterial({
+        color: roleGemColor,
+        emissive: roleGemColor,
+        emissiveIntensity: 0.75,
+        roughness: 0.2,
+      })
+    );
+    roleGem.position.set(0, 0.98, 0);
+    group.add(roleGem);
 
     parent.add(group);
 
@@ -1322,11 +2582,12 @@ export class ThreeCampus {
       role,
       roomId,
       group,
-      leftLeg,
-      rightLeg,
+      leftLegGroup,
+      rightLegGroup,
       leftArm,
       rightArm,
       head,
+      roleGem,
       currentPos: new THREE.Vector3(x, y, z),
       targetPos: new THREE.Vector3(x, y, z),
       homePos: new THREE.Vector3(x, y, z),
@@ -1353,14 +2614,20 @@ export class ThreeCampus {
     }
 
     for (const agent of this.staffAgents) {
+      // Animate floating role gem
+      if (agent.roleGem) {
+        agent.roleGem.rotation.y += delta * 2.5;
+        agent.roleGem.position.y = 0.98 + Math.sin(time * 3 + agent.seed) * 0.04;
+      }
+
       agent.stateTimer -= delta;
 
       if (agent.state === "working") {
         agent.group.position.y = agent.currentPos.y + Math.sin(time * 3 + agent.seed) * 0.015;
         agent.rightArm.rotation.x = Math.sin(time * 4 + agent.seed) * 0.3 - 0.2;
         agent.leftArm.rotation.x = Math.cos(time * 3 + agent.seed) * 0.15;
-        agent.leftLeg.rotation.x = 0;
-        agent.rightLeg.rotation.x = 0;
+        agent.leftLegGroup.rotation.x = 0;
+        agent.rightLegGroup.rotation.x = 0;
 
         if (agent.stateTimer <= 0) {
           const nextTarget = agent.patrolPoints[Math.floor(Math.random() * agent.patrolPoints.length)] || agent.homePos;
@@ -1377,8 +2644,8 @@ export class ThreeCampus {
           agent.group.position.copy(agent.currentPos);
           agent.state = "working";
           agent.stateTimer = 3 + Math.random() * 6;
-          agent.leftLeg.rotation.x = 0;
-          agent.rightLeg.rotation.x = 0;
+          agent.leftLegGroup.rotation.x = 0;
+          agent.rightLegGroup.rotation.x = 0;
           agent.leftArm.rotation.x = 0;
           agent.rightArm.rotation.x = 0;
         } else {
@@ -1391,8 +2658,8 @@ export class ThreeCampus {
           agent.group.rotation.y = Math.atan2(toTarget.x, toTarget.z);
 
           agent.walkCycle += delta * 9;
-          agent.leftLeg.rotation.x = Math.sin(agent.walkCycle) * 0.6;
-          agent.rightLeg.rotation.x = -Math.sin(agent.walkCycle) * 0.6;
+          agent.leftLegGroup.rotation.x = Math.sin(agent.walkCycle) * 0.65;
+          agent.rightLegGroup.rotation.x = -Math.sin(agent.walkCycle) * 0.65;
           agent.leftArm.rotation.x = -Math.sin(agent.walkCycle) * 0.5;
           agent.rightArm.rotation.x = Math.sin(agent.walkCycle) * 0.5;
           agent.group.position.y = agent.currentPos.y + Math.abs(Math.sin(agent.walkCycle)) * 0.035;
