@@ -218,10 +218,25 @@ export type Game = {
   ledger?: WeekLedger[];
   lastWeekSummary?: WeekLedger;
   finance?: FinanceState;
-  pendingDecision?: DecisionEvent | null;
+  pendingDecision?: PendingDecisionState | null;
   eventHistory?: string[];
   achievements?: string[];
   valuation?: number;
+};
+
+export type PendingDecisionChoice = {
+  id: string;
+  label: string;
+  cost?: number;
+  blurb: string;
+};
+
+export type PendingDecisionState = {
+  id: string;
+  title: string;
+  category: "regulatory" | "science" | "market" | "staff" | "production" | "opportunity";
+  description: string;
+  choices: PendingDecisionChoice[];
 };
 
 export type TechDef = { id: TechId; era: Era; branch: Branch; name: string; blurb: string; deep: string; cash: number; sci: number; need: TechId[] };
@@ -2426,7 +2441,18 @@ function worldEvent(g: Game, ledger?: WeekLedger) {
     const eligible = DECISION_EVENTS.filter((e) => !g.eventHistory?.includes(e.id) && e.canTrigger(g));
     if (eligible.length > 0) {
       const picked = eligible[Math.floor(roll(g.week * 13 + g.seq) * eligible.length)]!;
-      g.pendingDecision = picked;
+      g.pendingDecision = {
+        id: picked.id,
+        title: picked.title,
+        category: picked.category,
+        description: picked.description,
+        choices: picked.choices.map((c) => ({
+          id: c.id,
+          label: c.label,
+          cost: c.cost,
+          blurb: c.blurb,
+        })),
+      };
       g.eventHistory ??= [];
       g.eventHistory.push(picked.id);
       pushLog(g, `Dilemma strategico: ${picked.title}. Richiesta una decisione.`, "info");
@@ -2622,11 +2648,16 @@ export function tick(g: Game) {
 }
 
 export function resolveDecision(g: Game, choiceId: string): Game {
-  const next = structuredClone(g) as Game;
-  if (!next.pendingDecision) return next;
-  const choice = next.pendingDecision.choices.find((c) => c.id === choiceId);
-  if (!choice) return next;
-  if (choice.cost && next.cash < choice.cost) return next;
+  const decisionId = g.pendingDecision?.id;
+  if (!decisionId) return g;
+  const eventDef = DECISION_EVENTS.find((e) => e.id === decisionId);
+  const choice = eventDef?.choices.find((c) => c.id === choiceId);
+  if (!choice) return g;
+
+  const gClean = { ...g, pendingDecision: null };
+  const next = structuredClone(gClean) as Game;
+  if (choice.cost && next.cash < choice.cost) return g;
+
   const res = choice.apply(next);
   pushLog(next, res.log, res.tone);
   next.pendingDecision = null;

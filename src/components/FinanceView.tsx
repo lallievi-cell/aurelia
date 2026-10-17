@@ -30,6 +30,8 @@ import {
   acquireRival,
   extendPatent,
 } from "@/tycoon/model";
+import { soundCash, soundClick, soundSuccess } from "@/tycoon/audio";
+import { fireConfetti } from "@/tycoon/celebrate";
 import {
   type CreditRating,
   type InvestmentRound,
@@ -385,24 +387,33 @@ export function FinanceView({ game, apply, armReset, reset }: FinanceViewProps) 
                 <button
                   type="button"
                   disabled={availableCredit < 10000}
-                  onClick={() => apply(borrowMoney(game, 10000))}
-                  className="min-h-11 rounded-xl bg-card border border-line font-medium text-xs hover:border-teal disabled:opacity-40"
+                  onClick={() => {
+                    soundCash();
+                    apply(borrowMoney(game, 10000));
+                  }}
+                  className="min-h-11 rounded-xl bg-card border border-line font-medium text-xs hover:border-teal disabled:opacity-40 cursor-pointer transition-colors active:scale-95"
                 >
                   +10.000 €
                 </button>
                 <button
                   type="button"
                   disabled={availableCredit < 50000}
-                  onClick={() => apply(borrowMoney(game, 50000))}
-                  className="min-h-11 rounded-xl bg-card border border-line font-medium text-xs hover:border-teal disabled:opacity-40"
+                  onClick={() => {
+                    soundCash();
+                    apply(borrowMoney(game, 50000));
+                  }}
+                  className="min-h-11 rounded-xl bg-card border border-line font-medium text-xs hover:border-teal disabled:opacity-40 cursor-pointer transition-colors active:scale-95"
                 >
                   +50.000 €
                 </button>
                 <button
                   type="button"
                   disabled={availableCredit < 200000}
-                  onClick={() => apply(borrowMoney(game, 200000))}
-                  className="min-h-11 rounded-xl bg-card border border-line font-medium text-xs hover:border-teal disabled:opacity-40"
+                  onClick={() => {
+                    soundCash();
+                    apply(borrowMoney(game, 200000));
+                  }}
+                  className="min-h-11 rounded-xl bg-card border border-line font-medium text-xs hover:border-teal disabled:opacity-40 cursor-pointer transition-colors active:scale-95"
                 >
                   +200.000 €
                 </button>
@@ -419,24 +430,33 @@ export function FinanceView({ game, apply, armReset, reset }: FinanceViewProps) 
                   <button
                     type="button"
                     disabled={game.cash < 10000}
-                    onClick={() => apply(repayMoney(game, 10000))}
-                    className="min-h-11 rounded-xl bg-card border border-line font-medium text-xs hover:border-amber disabled:opacity-40"
+                    onClick={() => {
+                      soundClick();
+                      apply(repayMoney(game, 10000));
+                    }}
+                    className="min-h-11 rounded-xl bg-card border border-line font-medium text-xs hover:border-amber disabled:opacity-40 cursor-pointer transition-colors active:scale-95"
                   >
                     -10.000 €
                   </button>
                   <button
                     type="button"
                     disabled={game.cash < 50000}
-                    onClick={() => apply(repayMoney(game, 50000))}
-                    className="min-h-11 rounded-xl bg-card border border-line font-medium text-xs hover:border-amber disabled:opacity-40"
+                    onClick={() => {
+                      soundClick();
+                      apply(repayMoney(game, 50000));
+                    }}
+                    className="min-h-11 rounded-xl bg-card border border-line font-medium text-xs hover:border-amber disabled:opacity-40 cursor-pointer transition-colors active:scale-95"
                   >
                     -50.000 €
                   </button>
                   <button
                     type="button"
                     disabled={game.cash < 1000}
-                    onClick={() => apply(repayMoney(game, loan))}
-                    className="min-h-11 rounded-xl bg-teal text-card font-medium text-xs hover:opacity-90 disabled:opacity-40"
+                    onClick={() => {
+                      soundClick();
+                      apply(repayMoney(game, loan));
+                    }}
+                    className="min-h-11 rounded-xl bg-teal text-card font-medium text-xs hover:opacity-90 disabled:opacity-40 cursor-pointer transition-all active:scale-95 shadow-sm"
                   >
                     Estingui Debito
                   </button>
@@ -521,14 +541,22 @@ export function FinanceView({ game, apply, armReset, reset }: FinanceViewProps) 
                       <button
                         type="button"
                         disabled={!canTake}
-                        onClick={() => apply(acceptInvestmentRound(game, round.id))}
+                        onClick={() => {
+                          if (round.id === "ipo") {
+                            soundSuccess();
+                            fireConfetti();
+                          } else {
+                            soundCash();
+                          }
+                          apply(acceptInvestmentRound(game, round.id));
+                        }}
                         className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
                           canTake
-                            ? "bg-teal text-card hover:opacity-90 cursor-pointer shadow-sm"
+                            ? "bg-teal text-card hover:opacity-90 cursor-pointer shadow-sm active:scale-95"
                             : "bg-line text-mist cursor-not-allowed"
                         }`}
                       >
-                        {round.id === "ipo" ? "Lancia IPO!" : "Accetta Round"}
+                        {round.id === "ipo" ? "Lancia IPO! 🚀" : "Accetta Round"}
                       </button>
                     )}
                   </div>
@@ -569,22 +597,31 @@ export function FinanceView({ game, apply, armReset, reset }: FinanceViewProps) 
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
-                        onClick={() => apply(setPrice(game, product.id, product.price - 5))}
-                        className="h-8 px-2.5 rounded-lg border border-line bg-card text-xs font-medium hover:border-teal cursor-pointer"
+                        onClick={() => {
+                          soundClick();
+                          apply(setPrice(game, product.id, product.price - 5));
+                        }}
+                        className="h-8 px-2.5 rounded-lg border border-line bg-card text-xs font-medium hover:border-teal cursor-pointer active:scale-95 transition-all"
                       >
                         -5 €
                       </button>
                       <button
                         type="button"
-                        onClick={() => apply(setPrice(game, product.id, product.price + 5))}
-                        className="h-8 px-2.5 rounded-lg border border-line bg-card text-xs font-medium hover:border-teal cursor-pointer"
+                        onClick={() => {
+                          soundClick();
+                          apply(setPrice(game, product.id, product.price + 5));
+                        }}
+                        className="h-8 px-2.5 rounded-lg border border-line bg-card text-xs font-medium hover:border-teal cursor-pointer active:scale-95 transition-all"
                       >
                         +5 €
                       </button>
                       <button
                         type="button"
-                        onClick={() => apply(extendPatent(game, product.id))}
-                        className="h-8 px-2.5 rounded-lg bg-teal/10 border border-teal/30 text-teal text-xs font-semibold hover:bg-teal hover:text-card transition-colors cursor-pointer"
+                        onClick={() => {
+                          soundCash();
+                          apply(extendPatent(game, product.id));
+                        }}
+                        className="h-8 px-2.5 rounded-lg bg-teal/10 border border-teal/30 text-teal text-xs font-semibold hover:bg-teal hover:text-card transition-colors cursor-pointer active:scale-95"
                         title="Deposita nuova formulazione: estende il brevetto di 120 settimane (+10 € prezzo, costo: 75.000 € e 3 scienza)"
                       >
                         Nuova Formulazione
@@ -657,10 +694,14 @@ export function FinanceView({ game, apply, armReset, reset }: FinanceViewProps) 
                         <button
                           type="button"
                           disabled={!canAcquire}
-                          onClick={() => apply(acquireRival(game, rival.id))}
+                          onClick={() => {
+                            soundSuccess();
+                            fireConfetti();
+                            apply(acquireRival(game, rival.id));
+                          }}
                           className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
                             canAcquire
-                              ? "bg-amber text-ink hover:opacity-90 cursor-pointer shadow-sm"
+                              ? "bg-amber text-ink hover:opacity-90 cursor-pointer shadow-sm active:scale-95"
                               : "bg-line/60 text-mist cursor-not-allowed"
                           }`}
                         >
@@ -823,10 +864,13 @@ function SubTabBtn({
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={() => {
+        soundClick();
+        onClick();
+      }}
       className={`min-h-10 shrink-0 flex items-center gap-1.5 rounded-full px-3.5 text-xs font-semibold transition-all cursor-pointer ${
         active
-          ? "bg-ink text-card shadow-sm"
+          ? "bg-ink text-card shadow-sm scale-[1.02]"
           : "bg-card border border-line text-mist hover:text-ink hover:border-teal/40"
       }`}
     >

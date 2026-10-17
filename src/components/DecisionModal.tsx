@@ -1,11 +1,11 @@
 import React from "react";
 import { AlertTriangle, Award, Building, DollarSign, FileCheck, FlaskConical, Users } from "lucide-react";
-import { euro, type Game } from "@/tycoon/model";
+import { euro, type Game, type PendingDecisionState } from "@/tycoon/model";
 import type { DecisionEvent } from "@/tycoon/events";
 
 interface DecisionModalProps {
   game: Game;
-  decision: DecisionEvent;
+  decision: DecisionEvent | PendingDecisionState;
   onSelect: (choiceId: string) => void;
 }
 

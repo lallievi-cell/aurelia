@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, Building2, FastForward, FlaskConical, GitBranch, Globe2, Landmark, Map as MapIcon, Minus, Pause, Play, Plus, Radio, ScrollText, Users, X } from "lucide-react";
-import { blip, unlockAudio } from "@/tycoon/audio";
+import { ArrowLeft, Building2, Droplets, FastForward, FlaskConical, GitBranch, Globe2, Landmark, Map as MapIcon, Minus, PackageCheck, Pause, Play, Plus, Radio, ScrollText, Users, X, Zap } from "lucide-react";
+import { blip, unlockAudio, soundClick, soundCash, soundSuccess, soundLevelUp } from "@/tycoon/audio";
 import { drawCampus, fitZoom, loadCampusArt, pickSign, pickTile, cameraBounds, type Cam } from "@/tycoon/draw";
 import {
   AUTHORITIES,
@@ -345,84 +345,173 @@ export function AureliaGame() {
 
   return (
     <div className="flex h-dvh flex-col bg-paper text-ink">
-      <header className="hud safe-top z-20 flex items-center justify-between gap-1.5 px-3 pb-2">
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          <img src={`${import.meta.env.BASE_URL}aurelia/crest.png`} alt="" className="h-10 w-10 shrink-0 rounded-full shadow-md" />
+      <header className="hud safe-top z-20 flex items-center justify-between gap-1.5 px-3 pb-2 backdrop-blur-md">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          <div className="relative shrink-0">
+            <img
+              src={`${import.meta.env.BASE_URL}aurelia/crest.png`}
+              alt="Aurelia CDMO"
+              className="h-10 w-10 rounded-full ring-2 ring-emerald-500/40 shadow-[0_0_14px_rgba(27,122,100,0.35)] object-cover"
+            />
+          </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <p className="text-[10px] font-semibold tracking-[0.16em] text-teal uppercase">{game.chapter}</p>
+              <span className="text-[10px] font-bold tracking-[0.18em] text-teal uppercase">{game.chapter}</span>
               <button
                 type="button"
-                onClick={() => setTab("world")}
-                className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-card border border-line text-[10px] font-semibold text-ink hover:border-teal cursor-pointer"
+                onClick={() => {
+                  soundClick();
+                  setTab("world");
+                }}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-card/90 border border-line/60 text-[10px] font-semibold text-ink hover:border-teal cursor-pointer shadow-xs transition-colors"
                 title="Valutazione e Grado d'Impresa"
               >
                 <Building2 className="h-2.5 w-2.5 text-teal" />
-                <span>{currentRank(valInfo.total).title}</span>
+                <span className="truncate max-w-[90px] sm:max-w-none">{currentRank(valInfo.total).title}</span>
               </button>
             </div>
-            <p className="truncate font-display text-xl leading-none">{game.name}</p>
-            <p className="text-[11px] text-mist">anno {yearOf(game.week)}</p>
+            <p className="truncate font-display text-xl leading-none tracking-tight">{game.name}</p>
+            <p className="text-[11px] text-mist font-medium">anno {yearOf(game.week)}</p>
           </div>
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
           <div
-            className="cash px-2.5 py-1 text-right cursor-pointer hover:opacity-90 transition-opacity"
-            onClick={() => setTab("world")}
-            title="Apri Bilancio & Finanza"
+            className="cash px-2.5 py-1 text-right cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-transform select-none"
+            onClick={() => {
+              soundCash();
+              setTab("world");
+            }}
+            title="Apri Bilancio & Finanza Industriale"
           >
-            <p className="font-display text-base leading-none">{euro(game.cash)}</p>
+            <div className="flex items-center justify-end gap-1">
+              <span className="font-display text-base leading-none text-card">{euro(game.cash)}</span>
+            </div>
             <div className="flex items-center justify-end gap-1 text-[10px]">
-              <span className={`font-semibold ${lastNet >= 0 ? "text-emerald-400" : "text-amber-300"}`}>
+              <span className={`font-semibold ${lastNet >= 0 ? "text-emerald-300" : "text-amber-300"}`}>
                 {lastNet >= 0 ? "+" : ""}{euro(lastNet)}/s
               </span>
-              <span className="text-foam/60">· s.{game.week}</span>
+              <span className="text-white/60">· s.{game.week}</span>
             </div>
           </div>
 
-          <button
-            type="button"
-            aria-label="Avanza di una settimana"
-            onClick={() => apply(tick(game))}
-            className="grid h-10 w-10 place-items-center rounded-full bg-amber text-ink shadow-sm hover:opacity-90 active:scale-95 cursor-pointer"
-          >
-            <Plus className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-1 bg-card/90 p-0.5 rounded-full border border-line/60 shadow-xs">
+            <button
+              type="button"
+              aria-label="Avanza di una settimana"
+              onClick={() => {
+                soundClick();
+                apply(tick(game));
+              }}
+              title="Avanza di 1 settimana (tasto Spazio)"
+              className="grid h-9 w-9 place-items-center rounded-full bg-paper hover:bg-amber hover:text-ink text-ink transition-colors cursor-pointer active:scale-95"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
 
-          <button
-            type="button"
-            aria-label={playing ? "Metti in pausa" : "Fai scorrere le settimane"}
-            onClick={() => {
-              unlockAudio();
-              setPlaying((v) => !v);
-            }}
-            className={`grid h-10 w-10 place-items-center rounded-full shadow-sm hover:opacity-90 active:scale-95 cursor-pointer ${
-              playing ? "bg-amber text-ink" : "bg-ink text-card"
-            }`}
-          >
-            {playing ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
-          </button>
+            <button
+              type="button"
+              aria-label={playing ? "Metti in pausa" : "Fai scorrere le settimane"}
+              onClick={() => {
+                soundClick();
+                unlockAudio();
+                setPlaying((v) => !v);
+              }}
+              title={playing ? "Pausa (Spazio)" : "Avvia simulazione (Spazio)"}
+              className={`grid h-9 w-9 place-items-center rounded-full transition-all cursor-pointer active:scale-95 ${
+                playing
+                  ? "bg-amber text-ink ring-2 ring-amber/50 animate-pulse shadow-md"
+                  : "bg-ink text-card hover:bg-teal"
+              }`}
+            >
+              {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 ml-0.5" />}
+            </button>
 
-          <button
-            type="button"
-            title="Velocità (1x, 2x, 4x - tasti 1, 2, 4)"
-            onClick={() => {
-              unlockAudio();
-              setSpeed((s) => (s === 1 ? 2 : s === 2 ? 4 : 1));
-            }}
-            className="h-10 px-2 rounded-full border border-line bg-card flex items-center gap-0.5 text-xs font-bold text-ink hover:border-teal active:scale-95 cursor-pointer"
-          >
-            <FastForward className="h-3.5 w-3.5 text-teal" />
-            <span>{speed}x</span>
-          </button>
+            <button
+              type="button"
+              title="Velocità simulazione: 1x, 2x, 4x (tasti 1, 2, 4)"
+              onClick={() => {
+                soundClick();
+                unlockAudio();
+                setSpeed((s) => (s === 1 ? 2 : s === 2 ? 4 : 1));
+              }}
+              className="h-9 px-2 rounded-full bg-paper hover:border-teal flex items-center gap-1 text-xs font-bold text-ink cursor-pointer active:scale-95 transition-all"
+            >
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  speed === 1
+                    ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]"
+                    : speed === 2
+                    ? "bg-cyan-500 shadow-[0_0_6px_rgba(6,182,212,0.8)]"
+                    : "bg-amber shadow-[0_0_8px_rgba(200,136,18,0.9)] animate-pulse"
+                }`}
+              />
+              <span>{speed}x</span>
+            </button>
+          </div>
         </div>
       </header>
-      <div className="grid grid-cols-4 gap-1.5 border-b border-line bg-paper/80 px-2 py-1.5">
-        <span className="meter"><i className="bg-teal" />API {game.api}/{capOf(game, "api")}</span>
-        <span className="meter"><i className="bg-amber" />Sol {game.solvent}</span>
-        <button type="button" className="meter" onClick={() => setToast(scienceHint(game))}><i className="bg-ink" />Sci {Math.floor(game.science)}</button>
-        <span className="meter"><i className="bg-mist" />kW {power?.demand}/{power?.supply}</span>
+
+      {/* Telemetry Dashboard Meters */}
+      <div className="grid grid-cols-4 gap-1.5 border-b border-line/60 bg-paper/90 backdrop-blur-md px-2.5 py-1.5 text-[11px] shadow-xs">
+        <div
+          className="meter flex items-center gap-1 px-2 py-1 rounded-lg bg-card/85 border border-line/60 select-none"
+          title="Capacità e Scorte API (Principio Attivo)"
+        >
+          <PackageCheck className="h-3.5 w-3.5 text-teal shrink-0" />
+          <span className="font-semibold text-ink text-[10px]">API</span>
+          <span className="font-mono text-mist font-semibold ml-auto text-[10px]">
+            {game.api}/{capOf(game, "api")}
+          </span>
+        </div>
+
+        <div
+          className="meter flex items-center gap-1 px-2 py-1 rounded-lg bg-card/85 border border-line/60 select-none"
+          title="Scorte Solventi di sintesi"
+        >
+          <Droplets className="h-3.5 w-3.5 text-amber shrink-0" />
+          <span className="font-semibold text-ink text-[10px]">Sol</span>
+          <span className="font-mono text-mist font-semibold ml-auto text-[10px]">
+            {game.solvent}
+          </span>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            soundClick();
+            setToast(scienceHint(game));
+          }}
+          className="meter flex items-center gap-1 px-2 py-1 rounded-lg bg-card/85 border border-line/60 hover:border-teal cursor-pointer select-none transition-colors"
+          title="Scienza e Ricerca accumulata (tocca per consigli)"
+        >
+          <FlaskConical className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+          <span className="font-semibold text-ink text-[10px]">Sci</span>
+          <span className="font-mono text-mist font-semibold ml-auto text-[10px]">
+            {Math.floor(game.science)}
+          </span>
+        </button>
+
+        <div
+          className="meter flex items-center gap-1 px-2 py-1 rounded-lg bg-card/85 border border-line/60 select-none"
+          title="Rete Elettrica: Fabbisogno / Erogazione Impianti"
+        >
+          <Zap
+            className={`h-3.5 w-3.5 shrink-0 ${
+              (power?.demand ?? 0) > (power?.supply ?? 0)
+                ? "text-red-500 animate-pulse"
+                : "text-amber"
+            }`}
+          />
+          <span className="font-semibold text-ink text-[10px]">kW</span>
+          <span
+            className={`font-mono font-semibold ml-auto text-[10px] ${
+              (power?.demand ?? 0) > (power?.supply ?? 0) ? "text-red-600 font-bold" : "text-mist"
+            }`}
+          >
+            {power?.demand}/{power?.supply}
+          </span>
+        </div>
       </div>
 
       {game.log.length > 0 && (
@@ -566,10 +655,26 @@ function zoomBy(cam: Cam, canvas: HTMLCanvasElement | null, game: Game, factor: 
 
 function Nav({ icon, label, on, click, dot }: { icon: ReactNode; label: string; on: boolean; click: () => void; dot?: boolean }) {
   return (
-    <button type="button" onClick={click} className={`mx-0.5 my-1 flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-2xl text-[10px] leading-none ${on ? "bg-teal/10 text-teal" : "text-mist"}`}>
+    <button
+      type="button"
+      onClick={() => {
+        soundClick();
+        click();
+      }}
+      className={`mx-0.5 my-1 flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-2xl text-[10px] font-semibold transition-all cursor-pointer ${
+        on
+          ? "bg-teal/15 text-teal shadow-sm scale-[1.04]"
+          : "text-mist hover:text-ink hover:bg-card/60"
+      }`}
+    >
       <span className="relative [&_svg]:h-5 [&_svg]:w-5">
         {icon}
-        {dot ? <span className="absolute -top-0.5 -right-1.5 h-2 w-2 rounded-full bg-amber" /> : null}
+        {dot ? (
+          <>
+            <span className="absolute -top-0.5 -right-1.5 h-2 w-2 rounded-full bg-amber animate-ping" />
+            <span className="absolute -top-0.5 -right-1.5 h-2 w-2 rounded-full bg-amber" />
+          </>
+        ) : null}
       </span>
       {label}
     </button>
@@ -616,8 +721,9 @@ function BuildSheet({ game, c, r, apply, close, bought }: { game: Game; c: numbe
         <p className="text-sm text-mist">{parcel.tech ? `Tecnica: ${techDef(parcel.tech).name}. ` : ""}{parcel.needBatch ? "Serve un lotto già consegnato. " : ""}Costa {euro(parcel.cost)}.</p>
         <button
           type="button"
-          className="mt-3 min-h-11 w-full rounded-full bg-teal text-card"
+          className="mt-3 min-h-11 w-full rounded-full bg-teal font-semibold text-card hover:opacity-95 active:scale-95 transition-all shadow-xs"
           onClick={() => {
+            soundCash();
             const result = buyParcel(game, parcel.id as ParcelId);
             if (typeof result !== "string") bought();
             apply(result);
@@ -635,18 +741,18 @@ function BuildSheet({ game, c, r, apply, close, bought }: { game: Game; c: numbe
     <Sheet title={tile.corridor ? "Corridoio" : "Casella vuota"} onClose={close}>
       <p className="text-sm text-mist">Lotto {parcel.name}. Il tocco non costruisce da solo: scegli sotto.</p>
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <button type="button" className={`min-h-16 rounded-xl px-3 text-left ${want === "path" ? "bg-ink text-card" : "bg-paper"}`} onClick={() => setWant("path")}>
+        <button type="button" className={`min-h-16 rounded-xl px-3 text-left transition-all ${want === "path" ? "bg-ink text-card" : "bg-paper hover:bg-card"}`} onClick={() => { soundClick(); setWant("path"); }}>
           <span className="block font-medium">Corridoio</span>
           <span className="block text-sm opacity-80">Collega le stanze</span>
         </button>
-        <button type="button" className={`min-h-16 rounded-xl px-3 text-left ${want === "room" ? "bg-ink text-card" : "bg-paper"}`} onClick={() => setWant("room")}>
+        <button type="button" className={`min-h-16 rounded-xl px-3 text-left transition-all ${want === "room" ? "bg-ink text-card" : "bg-paper hover:bg-card"}`} onClick={() => { soundClick(); setWant("room"); }}>
           <span className="block font-medium">Stanza</span>
           <span className="block text-sm opacity-80">Da questo angolo</span>
         </button>
       </div>
       {want === "path" ? (
         tile.corridor ? (
-          <button type="button" className="mt-3 min-h-12 w-full rounded-full bg-paper" onClick={() => { apply(removeCorridor(game, c, r)); close(); }}>
+          <button type="button" className="mt-3 min-h-12 w-full rounded-full bg-paper hover:bg-line/40 text-sm transition-colors" onClick={() => { soundCash(); apply(removeCorridor(game, c, r)); close(); }}>
             Togli il corridoio · tornano 4 mila €
           </button>
         ) : (
@@ -654,8 +760,9 @@ function BuildSheet({ game, c, r, apply, close, bought }: { game: Game; c: numbe
             {pathBlock ? <p className="mt-3 text-sm text-amber">{pathBlock}</p> : <p className="mt-3 text-sm text-mist">Una striscia. Senza, la stanza non ha corrente.</p>}
             <button
               type="button"
-              className="mt-2 min-h-12 w-full rounded-full bg-teal font-semibold text-card"
+              className="mt-2 min-h-12 w-full rounded-full bg-teal font-semibold text-card hover:opacity-95 active:scale-95 transition-all shadow-xs"
               onClick={() => {
+                soundClick();
                 const result = placeCorridor(game, c, r);
                 apply(result);
                 if (typeof result !== "string") close();
@@ -678,8 +785,9 @@ function BuildSheet({ game, c, r, apply, close, bought }: { game: Game; c: numbe
                 <button
                   key={def.type}
                   type="button"
-                  className="min-h-14 rounded-xl border border-line bg-paper px-3 text-left"
+                  className="min-h-14 rounded-xl border border-line bg-paper px-3 text-left hover:border-teal transition-colors active:scale-[0.99]"
                   onClick={() => {
+                    soundClick();
                     const result = placeRoom(game, def.type, c, r);
                     apply(result);
                     if (typeof result !== "string") close();
@@ -722,13 +830,13 @@ function RoomPanel({ game, id, apply, close }: { game: Game; id: string; apply: 
                 {s.name}
                 <span className="block text-sm text-mist">{TRAIT_LABEL[s.trait]} · abilità {s.skill}</span>
               </span>
-              <button type="button" className="min-h-11 rounded-full px-3 text-sm text-teal" onClick={() => apply(assign(game, s.id, null))}>
+              <button type="button" className="min-h-11 rounded-full px-3 text-sm text-teal hover:bg-teal/10 transition-colors" onClick={() => { soundClick(); apply(assign(game, s.id, null)); }}>
                 Togli
               </button>
             </div>
           ))}
           {free.map((s) => (
-            <button key={s.id} type="button" className="min-h-11 rounded-xl border border-line px-3 text-left" onClick={() => apply(assign(game, s.id, id))}>
+            <button key={s.id} type="button" className="min-h-11 rounded-xl border border-line px-3 text-left hover:border-teal transition-colors" onClick={() => { soundClick(); apply(assign(game, s.id, id)); }}>
               Assegna {s.name} · {TRAIT_LABEL[s.trait]}
             </button>
           ))}
@@ -740,7 +848,7 @@ function RoomPanel({ game, id, apply, close }: { game: Game; id: string; apply: 
           const open = pick === index;
           return (
             <div key={index} className="rounded-xl border border-dashed border-line p-2">
-              <button type="button" className="min-h-11 w-full text-left text-sm" onClick={() => setPick(open ? null : index)}>
+              <button type="button" className="min-h-11 w-full text-left text-sm" onClick={() => { soundClick(); setPick(open ? null : index); }}>
                 Posto {index + 1} · {open ? "scegli qui sotto" : "tocca per arredare"}
               </button>
               {open ? <GearChoices game={game} roomType={room.type} roomId={id} index={index} apply={apply} /> : null}
@@ -761,12 +869,12 @@ function RoomPanel({ game, id, apply, close }: { game: Game; id: string; apply: 
             <p className="text-sm">{gearNote(item.defId)}</p>
             <div className="mt-2 flex gap-2">
               {item.level < spec.maxLevel ? (
-                <button type="button" className="min-h-11 flex-1 rounded-full bg-ink text-sm text-card" onClick={() => apply(upgradeGear(game, id, index))}>
+                <button type="button" className="min-h-11 flex-1 rounded-full bg-ink text-sm text-card hover:bg-teal active:scale-95 transition-all shadow-xs" onClick={() => { soundClick(); apply(upgradeGear(game, id, index)); }}>
                   Potenzia · {euro(spec.cost * item.level)}
                 </button>
               ) : null}
               {item.defId !== "scrivania" ? (
-                <button type="button" className="min-h-11 rounded-full px-3 text-sm text-mist" onClick={() => apply(removeGear(game, id, index))}>
+                <button type="button" className="min-h-11 rounded-full px-3 text-sm text-mist hover:text-red-500 transition-colors" onClick={() => { soundCash(); apply(removeGear(game, id, index)); }}>
                   Vendi
                 </button>
               ) : null}
@@ -776,25 +884,25 @@ function RoomPanel({ game, id, apply, close }: { game: Game; id: string; apply: 
       })}
       {room.level < 3 ? (
         <div>
-          <button type="button" className="min-h-11 w-full rounded-full bg-ink text-card" onClick={() => apply(upgradeRoom(game, id))}>
+          <button type="button" className="min-h-11 w-full rounded-full bg-ink text-card hover:bg-teal active:scale-95 transition-all shadow-xs" onClick={() => { soundLevelUp(); apply(upgradeRoom(game, id)); }}>
             Livello stanza {room.level + 1} · {euro(upgradeRoomCost(room))}
           </button>
           <p className="mt-1 text-sm text-mist">{roomLevelNote(room.type)}</p>
         </div>
       ) : null}
       {def.expand && !room.expanded ? (
-        <button type="button" className="min-h-11 rounded-full bg-paper" onClick={() => apply(expandRoom(game, id))}>
+        <button type="button" className="min-h-11 rounded-full bg-paper hover:bg-card transition-colors" onClick={() => { soundClick(); apply(expandRoom(game, id)); }}>
           Allarga · {euro(Math.round(def.shell * 0.7))}
           {canExpand(game, id) ? ` · ${canExpand(game, id)}` : ""}
         </button>
       ) : null}
       {room.type === "qc" && hasGear(game, "bilancia") ? (
-        <button type="button" className="min-h-11 rounded-full bg-teal text-card" onClick={() => apply(audit(game))}>
+        <button type="button" className="min-h-11 rounded-full bg-teal font-semibold text-card hover:opacity-95 active:scale-95 transition-all shadow-xs" onClick={() => { soundSuccess(); apply(audit(game)); }}>
           Audit · 40 mila €
         </button>
       ) : null}
       {room.type !== "hq" ? (
-        <button type="button" className="min-h-11 rounded-full border border-line text-mist" onClick={() => { const result = removeRoom(game, id); apply(result); if (typeof result !== "string") close(); }}>
+        <button type="button" className="min-h-11 rounded-full border border-line text-mist hover:text-red-500 hover:border-red-400 transition-colors" onClick={() => { soundCash(); const result = removeRoom(game, id); apply(result); if (typeof result !== "string") close(); }}>
           Smonta il guscio vuoto
         </button>
       ) : null}
@@ -811,14 +919,14 @@ function GearChoices({ game, roomType, roomId, index, apply }: { game: Game; roo
         item.mats ? (
           <div key={item.id} className="grid grid-cols-3 gap-1">
             {(["api", "solvent", "eccipient"] as MatKey[]).map((mat) => (
-              <button key={mat} type="button" className="min-h-11 rounded-lg bg-paper text-xs" onClick={() => apply(installGear(game, roomId, index, item.id, mat))}>
+              <button key={mat} type="button" className="min-h-11 rounded-lg bg-paper text-xs hover:border-teal border border-transparent transition-colors" onClick={() => { soundCash(); apply(installGear(game, roomId, index, item.id, mat)); }}>
                 Scaffale {MAT_LABEL[mat]}
               </button>
             ))}
           </div>
         ) : (
-          <button key={item.id} type="button" className="min-h-11 rounded-lg bg-paper px-2 py-2 text-left text-sm" onClick={() => apply(installGear(game, roomId, index, item.id))}>
-            <span className="block">{item.name} · {euro(item.cost)}</span>
+          <button key={item.id} type="button" className="min-h-11 rounded-lg bg-paper px-2 py-2 text-left text-sm hover:border-teal border border-transparent transition-colors active:scale-[0.99]" onClick={() => { soundCash(); apply(installGear(game, roomId, index, item.id)); }}>
+            <span className="block font-medium">{item.name} · {euro(item.cost)}</span>
             <span className="block text-xs text-mist">{gearNote(item.id)}</span>
             {canInstall(game, roomId, index, item.id) ? <span className="block text-mist">{canInstall(game, roomId, index, item.id)}</span> : null}
             <span className="block text-mist">{item.kw ? `${item.id === "reattore" ? "3–5" : item.kw} kW` : item.supply ? `+${item.supply} kW a livello` : "non consuma"}</span>
@@ -1049,19 +1157,19 @@ function Letter({ game, offer, open, apply, toggle, signed }: { game: Game; offe
       {open ? (
         <div className="mt-3 grid gap-2">
           {CLAUSES.map((clause) => (
-            <button key={clause.key} type="button" aria-pressed={clauses[clause.key]} className={`min-h-14 rounded-xl px-3 text-left ${clauses[clause.key] ? "bg-ink text-card" : "bg-card"}`} onClick={() => apply(tuneOffer(game, offer.id, clause.key))}>
+            <button key={clause.key} type="button" aria-pressed={clauses[clause.key]} className={`min-h-14 rounded-xl px-3 text-left ${clauses[clause.key] ? "bg-ink text-card" : "bg-card"}`} onClick={() => { soundClick(); apply(tuneOffer(game, offer.id, clause.key)); }}>
               <span className="block text-sm font-medium">{clause.name}</span>
               <span className={`block text-xs ${clauses[clause.key] ? "text-white/70" : "text-mist"}`}>{clause.text}</span>
             </button>
           ))}
           <p className="text-sm text-mist">{fit} {spec}</p>
-          <button type="button" className="min-h-12 rounded-full bg-teal font-semibold text-card" onClick={() => { signed(); apply(acceptOffer(game, offer.id)); }}>Firma così</button>
-          <button type="button" className="min-h-11 rounded-full text-sm text-mist" onClick={() => { signed(); apply(declineOffer(game, offer.id)); }}>Rimanda la busta</button>
+          <button type="button" className="min-h-12 rounded-full bg-teal font-semibold text-card hover:opacity-95 active:scale-95 transition-all shadow-sm" onClick={() => { soundCash(); signed(); apply(acceptOffer(game, offer.id)); }}>Firma così</button>
+          <button type="button" className="min-h-11 rounded-full text-sm text-mist hover:text-ink transition-colors" onClick={() => { soundClick(); signed(); apply(declineOffer(game, offer.id)); }}>Rimanda la busta</button>
         </div>
       ) : (
         <div className="mt-3 grid grid-cols-2 gap-2">
-          <button type="button" className="min-h-11 rounded-full bg-paper text-sm" onClick={toggle}>Tratta</button>
-          <button type="button" className="min-h-11 rounded-full bg-teal font-semibold text-card" onClick={() => apply(acceptOffer(game, offer.id))}>Firma</button>
+          <button type="button" className="min-h-11 rounded-full bg-paper text-sm hover:bg-line/40 transition-colors" onClick={() => { soundClick(); toggle(); }}>Tratta</button>
+          <button type="button" className="min-h-11 rounded-full bg-teal font-semibold text-card hover:opacity-95 active:scale-95 transition-all shadow-sm" onClick={() => { soundCash(); apply(acceptOffer(game, offer.id)); }}>Firma</button>
         </div>
       )}
     </article>
@@ -1171,13 +1279,32 @@ function StudyPage({ game, program, apply }: { game: Game; program: Program; app
       ) : null}
       <p className="mt-2 text-sm">{pace.text}</p>
       {rival ? <p className="mt-1 text-sm text-amber">{rival.name} è sulla stessa indicazione · pressione {program.heat ?? 0}/3</p> : null}
-      {program.stage === "approved" ? <button type="button" className="mt-3 min-h-12 w-full rounded-full bg-teal font-semibold text-card" onClick={() => apply(launchProduct(game, program.id))}>Metti in commercio</button> : null}
+      {program.stage === "approved" ? (
+        <button
+          type="button"
+          className="mt-3 min-h-12 w-full rounded-full bg-teal font-semibold text-card hover:opacity-95 active:scale-95 transition-all shadow-md"
+          onClick={() => {
+            soundSuccess();
+            fireConfetti();
+            apply(launchProduct(game, program.id));
+          }}
+        >
+          Metti in commercio 🎉
+        </button>
+      ) : null}
       {program.waiting && step && program.stage !== "dossier" ? (
         <div className="mt-3 grid gap-2">
           {risk > 0 ? <p className="text-sm">Rischio di fermarsi {Math.round(risk * 100)}%. La qualità dei lotti lo abbassa.</p> : null}
           {(program.modality ?? "chimica") === "biologico" && (program.stage === "phase1" || program.stage === "phase2") ? <p className="text-sm text-mist">Il passaggio chiede 4 flaconi.</p> : null}
           {gate ? <p className="text-sm text-amber">{gate}</p> : null}
-          <button type="button" className="min-h-12 rounded-full bg-ink font-semibold text-card" onClick={() => apply(advanceProgram(game, program.id))}>
+          <button
+            type="button"
+            className="min-h-12 rounded-full bg-ink font-semibold text-card hover:bg-teal active:scale-95 transition-all shadow-xs"
+            onClick={() => {
+              soundSuccess();
+              apply(advanceProgram(game, program.id));
+            }}
+          >
             {step.label}{cost ? ` · ${euro(cost)}` : ""}
           </button>
         </div>
@@ -1186,7 +1313,15 @@ function StudyPage({ game, program, apply }: { game: Game; program: Program; app
         <div className="mt-3 grid gap-2">
           {gate ? <p className="text-sm text-amber">{gate}</p> : <p className="text-sm text-mist">Un regolatorio in stanza e il dossier a livello 2 accorciano l'attesa. Costo {euro(cost)}.</p>}
           {AUTHORITIES.map((authority) => (
-            <button key={authority.id} type="button" className="min-h-14 rounded-xl bg-card px-3 text-left" onClick={() => apply(advanceProgram(game, program.id, authority.id))}>
+            <button
+              key={authority.id}
+              type="button"
+              className="min-h-14 rounded-xl bg-card px-3 text-left hover:border-teal border border-transparent transition-all shadow-xs"
+              onClick={() => {
+                soundSuccess();
+                apply(advanceProgram(game, program.id, authority.id));
+              }}
+            >
               <span className="block text-sm font-medium">{authority.name} · {authority.weeks} sett.</span>
               <span className="block text-xs text-mist">{authority.blurb}</span>
               {authority.id === "fda" && !hasGear(game, "serial") ? <span className="block text-xs text-amber">Prima la serializzazione.</span> : null}
@@ -1195,10 +1330,28 @@ function StudyPage({ game, program, apply }: { game: Game; program: Program; app
         </div>
       ) : null}
       {canPush ? (
-        <button type="button" className="mt-3 min-h-11 w-full rounded-full bg-card text-sm" onClick={() => apply(pushScience(game, program.id))}>Spingi con 4 scienza</button>
+        <button
+          type="button"
+          className="mt-3 min-h-11 w-full rounded-full bg-card hover:border-teal border border-line text-sm transition-colors"
+          onClick={() => {
+            soundClick();
+            apply(pushScience(game, program.id));
+          }}
+        >
+          Spingi con 4 scienza
+        </button>
       ) : null}
       {program.patented && !["failed", "launched", "licensed", "approved"].includes(program.stage) ? (
-        <button type="button" className="mt-2 min-h-11 w-full rounded-full bg-paper text-sm" onClick={() => apply(licenseOut(game, program.id))}>Cedi · {euro(licenseValue(program, game))}</button>
+        <button
+          type="button"
+          className="mt-2 min-h-11 w-full rounded-full bg-paper hover:bg-line/40 text-sm transition-colors"
+          onClick={() => {
+            soundCash();
+            apply(licenseOut(game, program.id));
+          }}
+        >
+          Cedi · {euro(licenseValue(program, game))}
+        </button>
       ) : null}
     </article>
   );
@@ -1262,13 +1415,27 @@ function TechTree({ game, apply }: { game: Game; apply: (g: Game | string) => vo
             ) : null}
             {!owned && gate ? <p className="mt-2 text-sm text-amber">{gate}</p> : null}
             {!owned && !gate ? (
-              <button type="button" className="mt-3 min-h-12 w-full rounded-full bg-teal font-semibold text-card" onClick={() => apply(buyTech(game, tech.id))}>
+              <button
+                type="button"
+                className="mt-3 min-h-12 w-full rounded-full bg-teal font-semibold text-card hover:opacity-95 active:scale-95 transition-all shadow-xs"
+                onClick={() => {
+                  soundClick();
+                  apply(buyTech(game, tech.id));
+                }}
+              >
                 Firma · {euro(tech.cash)} · scienza {tech.sci}
               </button>
             ) : null}
             {owned && !deep && again ? <p className="mt-2 text-sm text-amber">{again}</p> : null}
             {owned && !deep && !again ? (
-              <button type="button" className="mt-3 min-h-12 w-full rounded-full bg-ink font-semibold text-card" onClick={() => apply(masterTech(game, tech.id))}>
+              <button
+                type="button"
+                className="mt-3 min-h-12 w-full rounded-full bg-ink font-semibold text-card hover:bg-teal active:scale-95 transition-all shadow-xs"
+                onClick={() => {
+                  soundLevelUp();
+                  apply(masterTech(game, tech.id));
+                }}
+              >
                 Approfondisci · {euro(cost.cash)} · scienza {cost.sci}
               </button>
             ) : null}
@@ -1340,7 +1507,16 @@ function Team({ game, apply }: { game: Game; apply: (g: Game | string) => void }
                   <span className="text-sm text-mist">{ROLE_LABEL[member.role]} · {TRAIT_LABEL[member.trait]} · {euro(member.salary)}/sett.</span>
                 </span>
               </div>
-              <button type="button" className="min-h-11 shrink-0 rounded-full px-2 text-sm text-mist" onClick={() => apply(dismiss(game, member.id))}>Esci · {euro(member.salary * 2)}</button>
+              <button
+                type="button"
+                className="min-h-11 shrink-0 rounded-full px-2 text-sm text-mist hover:text-red-500 transition-colors"
+                onClick={() => {
+                  soundClick();
+                  apply(dismiss(game, member.id));
+                }}
+              >
+                Esci · {euro(member.salary * 2)}
+              </button>
             </div>
             <div className="mt-2 flex items-center justify-between">
               <Pips n={member.skill} />
@@ -1365,17 +1541,44 @@ function Team({ game, apply }: { game: Game; apply: (g: Game | string) => void }
             <p className="text-sm text-mist">{TRAIT_NOTE[member.trait]}</p>
             <div className="mt-2 flex flex-wrap gap-1">
               {member.roomId ? (
-                <button type="button" className="min-h-11 rounded-full bg-card px-3 text-sm" onClick={() => apply(assign(game, member.id, null))}>Panchina</button>
+                <button
+                  type="button"
+                  className="min-h-11 rounded-full bg-card px-3 text-sm hover:border-teal border border-transparent transition-colors"
+                  onClick={() => {
+                    soundClick();
+                    apply(assign(game, member.id, null));
+                  }}
+                >
+                  Panchina
+                </button>
               ) : null}
               {seats.map((seat) => (
-                <button key={seat.id} type="button" disabled={!seat.open || seat.here} className="min-h-11 rounded-full bg-card px-3 text-sm disabled:opacity-40" onClick={() => apply(assign(game, member.id, seat.id))}>
+                <button
+                  key={seat.id}
+                  type="button"
+                  disabled={!seat.open || seat.here}
+                  className="min-h-11 rounded-full bg-card px-3 text-sm disabled:opacity-40 hover:border-teal border border-transparent transition-colors"
+                  onClick={() => {
+                    soundClick();
+                    apply(assign(game, member.id, seat.id));
+                  }}
+                >
                   {seat.here ? seat.name : `${seat.name} · ${seat.used}/${seat.cap}`}
                 </button>
               ))}
             </div>
             {seats.length === 0 ? <p className="mt-2 text-sm text-mist">Nessuna stanza chiede questo ruolo.</p> : null}
             {member.skill >= 6 ? <p className="mt-2 text-sm text-mist">Abilità al massimo.</p> : hasTech(game, "formazione") ? (
-              <button type="button" className="mt-2 min-h-11 w-full rounded-full bg-ink text-sm text-card" onClick={() => apply(train(game, member.id))}>Forma · {euro(trainCost(game, member.skill))}</button>
+              <button
+                type="button"
+                className="mt-2 min-h-11 w-full rounded-full bg-ink text-sm text-card hover:bg-teal active:scale-95 transition-all shadow-xs"
+                onClick={() => {
+                  soundLevelUp();
+                  apply(train(game, member.id));
+                }}
+              >
+                Forma · {euro(trainCost(game, member.skill))}
+              </button>
             ) : <p className="mt-2 text-sm text-amber">Prima la tecnica Formazione. Poi l'abilità sale fino a 6.</p>}
           </article>
         );
@@ -1398,7 +1601,14 @@ function Team({ game, apply }: { game: Game; apply: (g: Game | string) => void }
             <div className="mt-2"><Pips n={member.skill} /></div>
             <p className="mt-1 text-sm text-mist">{TRAIT_NOTE[member.trait]}</p>
             {full ? <p className="mt-2 text-sm text-amber">La direzione è piena. Alza il suo livello.</p> : (
-              <button type="button" className="mt-2 min-h-12 w-full rounded-full bg-teal font-semibold text-card" onClick={() => apply(hire(game, member.id))}>
+              <button
+                type="button"
+                className="mt-2 min-h-12 w-full rounded-full bg-teal font-semibold text-card hover:opacity-95 active:scale-95 transition-all shadow-xs"
+                onClick={() => {
+                  soundCash();
+                  apply(hire(game, member.id));
+                }}
+              >
                 Assumi · {euro(hireCost(member.skill))}
               </button>
             )}

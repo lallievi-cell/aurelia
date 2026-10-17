@@ -1039,27 +1039,74 @@ export function drawCampus(ctx: CanvasRenderingContext2D, game: Game, viewW: num
   }
   drawParcelSigns(ctx, game, m, viewW, viewH);
 
-  // Floating feedback numbers and alerts
+  // Ambient diorama active room steam & energy particles
+  for (const r of game.rooms) {
+    if (["pilot", "plant", "power", "water", "sterile"].includes(r.type) && roomOnline(game, r)) {
+      const centerPos = tilePos(r.c + r.w / 2, r.r + r.h / 2, m);
+      ctx.save();
+      for (let i = 0; i < 3; i++) {
+        const pT = (t * 0.75 + i * 0.33) % 1;
+        const pY = centerPos.y - 24 - pT * 36;
+        const pX = centerPos.x + Math.sin(t * 1.8 + i * 2) * 8;
+        const radius = (2.5 + pT * 6) * m.zoom;
+        const alpha = Math.sin(pT * Math.PI) * 0.22;
+        ctx.fillStyle = r.type === "power" ? `rgba(200, 136, 18, ${alpha})` : `rgba(255, 255, 255, ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(pX, pY, Math.max(1, radius), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+
+  // Floating feedback numbers and alerts with embossed luxury badges
   const activeFloating = getActiveFloating();
   for (const { item, progress } of activeFloating) {
     const pos = tilePos(item.c, item.r, m);
-    const yDrift = Math.pow(progress, 0.7) * 48;
-    const alpha = progress < 0.15 ? progress / 0.15 : progress > 0.65 ? (1 - progress) / 0.35 : 1;
+    const yDrift = Math.pow(progress, 0.65) * 54;
+    const alpha = progress < 0.12 ? progress / 0.12 : progress > 0.7 ? (1 - progress) / 0.3 : 1;
+    const scale = progress < 0.15 ? 0.8 + (progress / 0.15) * 0.25 : progress > 0.85 ? 1.05 - (progress - 0.85) * 0.3 : 1.05;
+
     ctx.save();
     ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
-    ctx.font = "bold 15px Outfit, Trebuchet MS, sans-serif";
+    ctx.translate(pos.x, pos.y - yDrift - 22);
+    ctx.scale(scale, scale);
+
+    const font = "bold 14px Outfit, Trebuchet MS, sans-serif";
+    ctx.font = font;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.strokeStyle = "rgba(18,38,44,0.92)";
-    ctx.lineWidth = 3.5;
-    ctx.strokeText(item.text, pos.x, pos.y - yDrift - 18);
 
-    ctx.fillStyle =
+    const textWidth = ctx.measureText(item.text).width;
+    const badgeW = textWidth + 24;
+    const badgeH = 26;
+
+    // Draw backdrop pill with glow
+    ctx.shadowColor = item.tone === "gold" ? "rgba(200, 136, 18, 0.45)" : item.tone === "good" ? "rgba(16, 185, 129, 0.45)" : "rgba(18, 38, 44, 0.35)";
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetY = 3;
+
+    ctx.fillStyle = "rgba(14, 30, 35, 0.94)";
+    roundRect(ctx, -badgeW / 2, -badgeH / 2, badgeW, badgeH, 13);
+    ctx.fill();
+
+    // Border
+    ctx.strokeStyle =
       item.tone === "good" ? "#10b981" :
       item.tone === "gold" ? "#f59e0b" :
       item.tone === "bad" ? "#ef4444" :
-      item.tone === "science" ? "#38bdf8" : "#f7fbf9";
-    ctx.fillText(item.text, pos.x, pos.y - yDrift - 18);
+      item.tone === "science" ? "#38bdf8" : "#94a3b8";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+    ctx.fillStyle =
+      item.tone === "good" ? "#34d399" :
+      item.tone === "gold" ? "#fbbf24" :
+      item.tone === "bad" ? "#f87171" :
+      item.tone === "science" ? "#7dd3fc" : "#f8fafc";
+    ctx.fillText(item.text, 0, 0);
+
     ctx.restore();
   }
 
