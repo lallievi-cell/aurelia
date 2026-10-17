@@ -13,9 +13,17 @@ export function loadGame(): Game | null {
 }
 
 export function saveGame(game: Game) {
-  localStorage.setItem(KEY, JSON.stringify(game));
+  try {
+    localStorage.setItem(KEY, JSON.stringify(game));
+  } catch (e) {
+    console.warn("Storage write failed:", e);
+  }
 }
 
 export function clearGame() {
-  localStorage.removeItem(KEY);
+  try {
+    localStorage.removeItem(KEY);
+  } catch (e) {
+    console.warn("Storage remove failed:", e);
+  }
 }

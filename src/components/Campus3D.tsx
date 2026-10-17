@@ -53,40 +53,49 @@ export const Campus3D: React.FC<Campus3DProps> = ({
   const campusRef = useRef<ThreeCampus | null>(null);
   const [bulldozer, setBulldozer] = useState(false);
   const [overlay, setOverlay] = useState<"normal" | "power" | "quality" | "staff">("normal");
+  const [webglError, setWebglError] = useState<string | null>(null);
 
   // Initialize ThreeCampus
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
-    const campus = new ThreeCampus(el, {
-      onSelectRoom: (roomId) => {
-        onSelectRoom(roomId);
-      },
-      onSelectTile: (cell) => {
-        onSelectTile(cell);
-      },
-      onSelectParcel: (parcelId) => {
-        onSelectParcel(parcelId);
-      },
-      onMoveRoom: (roomId, targetCell) => {
-        onMoveRoom?.(roomId, targetCell);
-      },
-      onDemolishTile: (cell) => {
-        onDemolishTile?.(cell);
-      },
-    });
+    let campus: ThreeCampus | null = null;
+    try {
+      campus = new ThreeCampus(el, {
+        onSelectRoom: (roomId) => {
+          onSelectRoom(roomId);
+        },
+        onSelectTile: (cell) => {
+          onSelectTile(cell);
+        },
+        onSelectParcel: (parcelId) => {
+          onSelectParcel(parcelId);
+        },
+        onMoveRoom: (roomId, targetCell) => {
+          onMoveRoom?.(roomId, targetCell);
+        },
+        onDemolishTile: (cell) => {
+          onDemolishTile?.(cell);
+        },
+      });
 
-    campusRef.current = campus;
-    campus.update(game, selectedRoomId, selectedCell);
+      campusRef.current = campus;
+      campus.update(game, selectedRoomId, selectedCell);
+    } catch (err) {
+      console.error("ThreeCampus initialization error:", err);
+      setWebglError(err instanceof Error ? err.message : "Inizializzazione grafica 3D fallita");
+      onToggle2D?.();
+      return;
+    }
 
     // Store state in ref for keyboard handler
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (e.key === "q" || e.key === "Q") {
-        campus.rotateView(-1);
+        campus?.rotateView(-1);
       } else if (e.key === "e" || e.key === "E") {
-        campus.rotateView(1);
+        campus?.rotateView(1);
       } else if (e.key === "Escape") {
         if (stateRef.current.movingRoomId) stateRef.current.onCancelMove?.();
         if (stateRef.current.bulldozer) setBulldozer(false);
@@ -96,14 +105,14 @@ export const Campus3D: React.FC<Campus3DProps> = ({
 
     // Resize observer
     const ro = new ResizeObserver(() => {
-      campus.resize();
+      campus?.resize();
     });
     ro.observe(el);
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
       ro.disconnect();
-      campus.destroy();
+      campus?.destroy();
       campusRef.current = null;
     };
   }, []);
@@ -174,6 +183,28 @@ export const Campus3D: React.FC<Campus3DProps> = ({
             : "cursor-grab active:cursor-grabbing"
         }`}
       />
+
+      {/* WebGL Error / Mobile GPU Fallback */}
+      {webglError && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center p-6 bg-paper/95 z-50 text-center animate-in fade-in">
+          <div className="p-4 rounded-3xl bg-card border border-line/80 shadow-2xl max-w-sm flex flex-col items-center">
+            <Box className="h-10 w-10 text-amber mb-3" />
+            <h3 className="font-bold text-ink text-base mb-1">Accelerazione 3D non disponibile</h3>
+            <p className="text-mist text-xs mb-4">
+              La scheda grafica o il browser del tuo dispositivo non consentono il rendering 3D ({webglError}).
+            </p>
+            {onToggle2D && (
+              <button
+                type="button"
+                onClick={onToggle2D}
+                className="w-full py-2.5 px-4 bg-teal text-white rounded-xl font-bold text-xs shadow-md hover:bg-teal/90 active:scale-95 transition-all cursor-pointer"
+              >
+                Passa alla Vista Planimetrica 2D
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Top Floating Telemetry & Controls Bar */}
       <div className="absolute top-3 left-3 right-3 flex flex-wrap items-center justify-between gap-2 pointer-events-none z-10">

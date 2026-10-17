@@ -148,6 +148,9 @@ export class ThreeCampus {
   // Interactive meshes map
   private interactiveMeshes: THREE.Object3D[] = [];
 
+  private environmentBuilt = false;
+  private isContextLost = false;
+
   constructor(container: HTMLElement, options: ThreeCampusOptions) {
     this.container = container;
     this.options = options;
@@ -155,6 +158,11 @@ export class ThreeCampus {
     const width = container.clientWidth || 800;
     const height = container.clientHeight || 600;
     const aspect = width / height;
+
+    const isMobile =
+      typeof window !== "undefined" &&
+      (window.innerWidth < 768 ||
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
 
     // 1. Scene with soft atmospheric haze and sky dome
     this.scene = new THREE.Scene();
@@ -173,18 +181,42 @@ export class ThreeCampus {
     );
     this.updateCameraPosition();
 
-    // 3. Renderer with antialiasing and shadow maps
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    // 3. Renderer with antialiasing and shadow maps (optimized for mobile VRAM & GPU limits)
+    this.renderer = new THREE.WebGLRenderer({
+      antialias: !isMobile,
+      powerPreference: "default",
+      precision: isMobile ? "mediump" : "highp",
+      alpha: false,
+    });
     this.renderer.setSize(width, height);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(isMobile ? Math.min(window.devicePixelRatio, 1.5) : Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    this.renderer.shadowMap.type = isMobile ? THREE.BasicShadowMap : THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.08;
     this.container.appendChild(this.renderer.domElement);
 
+    // Context loss handlers for mobile stability
+    const dom = this.renderer.domElement;
+    dom.addEventListener("webglcontextlost", (e) => {
+      e.preventDefault();
+      this.isContextLost = true;
+      if (this.animFrameId) {
+        cancelAnimationFrame(this.animFrameId);
+        this.animFrameId = null;
+      }
+    });
+    dom.addEventListener("webglcontextrestored", () => {
+      this.isContextLost = false;
+      this.environmentBuilt = false;
+      if (this.currentGame) {
+        this.rebuildScene();
+      }
+      this.renderLoop();
+    });
+
     // 4. Lighting
-    this.setupLighting();
+    this.setupLighting(isMobile);
 
     // 5. Add Groups to Scene (Environment first as background foundation)
     this.scene.add(this.environmentGroup);
@@ -204,24 +236,25 @@ export class ThreeCampus {
     this.renderLoop();
   }
 
-  private setupLighting() {
+  private setupLighting(isMobile = false) {
     // Rich natural sky hemisphere light
     const hemiLight = new THREE.HemisphereLight(0xffffff, 0x7c9b8f, 0.95);
     this.scene.add(hemiLight);
 
-    // Golden sunlight with soft high-res photographic shadows
+    // Golden sunlight with soft shadows
     const sunLight = new THREE.DirectionalLight(0xfff6e6, 1.6);
     sunLight.position.set(40, 60, 30);
     sunLight.castShadow = true;
-    sunLight.shadow.mapSize.width = 4096;
-    sunLight.shadow.mapSize.height = 4096;
+    // 1024 on mobile prevents GPU driver OOM and WebGL context crash
+    sunLight.shadow.mapSize.width = isMobile ? 1024 : 2048;
+    sunLight.shadow.mapSize.height = isMobile ? 1024 : 2048;
     const d = 55;
     sunLight.shadow.camera.left = -d;
     sunLight.shadow.camera.right = d;
     sunLight.shadow.camera.top = d;
     sunLight.shadow.camera.bottom = -d;
     sunLight.shadow.bias = -0.0002;
-    sunLight.shadow.radius = 2.0;
+    sunLight.shadow.radius = isMobile ? 1.0 : 2.0;
     this.scene.add(sunLight);
 
     // Cool ambient mint fill light from opposite angle
@@ -543,11 +576,31 @@ export class ThreeCampus {
     this.rebuildScene();
   }
 
+  private disposeHierarchy(obj: THREE.Object3D) {
+    obj.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        const mesh = child as THREE.Mesh;
+        if (mesh.geometry) {
+          mesh.geometry.dispose();
+        }
+        if (mesh.material) {
+          if (Array.isArray(mesh.material)) {
+            for (const mat of mesh.material) {
+              mat.dispose();
+            }
+          } else {
+            mesh.material.dispose();
+          }
+        }
+      }
+    });
+  }
+
   private clearGroup(group: THREE.Group) {
     while (group.children.length > 0) {
       const obj = group.children[0]!;
       group.remove(obj);
-      if ((obj as any).geometry) (obj as any).geometry.dispose();
+      this.disposeHierarchy(obj);
     }
   }
 
@@ -560,7 +613,14 @@ export class ThreeCampus {
     this.animatedEmissives = [];
     this.staffAgents = [];
 
-    this.clearGroup(this.environmentGroup);
+    // The outdoor environment (roads, trees, parking, perimeter, chillers) is static
+    // Building it once prevents generating hundreds of meshes every single second
+    if (!this.environmentBuilt) {
+      this.clearGroup(this.environmentGroup);
+      this.buildEnvironment(game);
+      this.environmentBuilt = true;
+    }
+
     this.clearGroup(this.groundGroup);
     this.clearGroup(this.corridorsGroup);
     this.clearGroup(this.buildingsGroup);
@@ -568,7 +628,6 @@ export class ThreeCampus {
     this.clearGroup(this.staffGroup);
     this.clearGroup(this.effectsGroup);
 
-    this.buildEnvironment(game);
     this.buildTerrain(game);
     this.buildCorridors(game);
     this.buildRooms(game);
@@ -2670,6 +2729,7 @@ export class ThreeCampus {
 
   private renderLoop() {
     this.animFrameId = requestAnimationFrame(this.renderLoop);
+    if (this.isContextLost) return;
 
     const now = performance.now();
     const delta = Math.min((now - this.lastTime) / 1000, 0.1);
@@ -2677,13 +2737,27 @@ export class ThreeCampus {
     const time = (now - this.startTime) / 1000;
 
     this.updateAnimations(delta, time);
-    this.renderer.render(this.scene, this.camera);
+    try {
+      this.renderer.render(this.scene, this.camera);
+    } catch {
+      // Catch transient context loss on mobile
+    }
   }
 
   public destroy() {
     if (this.animFrameId) {
       cancelAnimationFrame(this.animFrameId);
+      this.animFrameId = null;
     }
+    this.clearGroup(this.environmentGroup);
+    this.clearGroup(this.groundGroup);
+    this.clearGroup(this.corridorsGroup);
+    this.clearGroup(this.buildingsGroup);
+    this.clearGroup(this.propsGroup);
+    this.clearGroup(this.staffGroup);
+    this.clearGroup(this.effectsGroup);
+    this.clearGroup(this.phantomGroup);
+
     this.renderer.dispose();
     if (this.container.contains(this.renderer.domElement)) {
       this.container.removeChild(this.renderer.domElement);
