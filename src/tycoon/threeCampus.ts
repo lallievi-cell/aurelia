@@ -111,12 +111,16 @@ export class ThreeCampus {
   private camAngleIndex = 0; // 0=NW, 1=NE, 2=SE, 3=SW
   private currentZoom = 26;
 
-  // Interaction & Touch Pinch
+  // Interaction, Pixel-Perfect Ground Lock & Touch Pinch
   private isDragging = false;
-  private prevPointer = { x: 0, y: 0 };
   private pointerDownPos = { x: 0, y: 0 };
   private activePointers = new Map<number, { x: number; y: number }>();
+  private lastGroundPos: THREE.Vector3 | null = null;
   private prevPinchDist = 0;
+  private prevPinchMid: { x: number; y: number } | null = null;
+  private panVelocity = { x: 0, z: 0 };
+  private lastMoveTime = performance.now();
+  private groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   private raycaster = new THREE.Raycaster();
   private mouse = new THREE.Vector2();
 
@@ -189,9 +193,9 @@ export class ThreeCampus {
       alpha: false,
     });
     this.renderer.setSize(width, height);
-    this.renderer.setPixelRatio(isMobile ? Math.min(window.devicePixelRatio, 1.5) : Math.min(window.devicePixelRatio, 2));
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = isMobile ? THREE.BasicShadowMap : THREE.PCFShadowMap;
+    this.renderer.setPixelRatio(isMobile ? 1.0 : Math.min(window.devicePixelRatio, 2));
+    this.renderer.shadowMap.enabled = !isMobile;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.08;
     this.container.appendChild(this.renderer.domElement);
@@ -244,10 +248,9 @@ export class ThreeCampus {
     // Golden sunlight with soft shadows
     const sunLight = new THREE.DirectionalLight(0xfff6e6, 1.6);
     sunLight.position.set(40, 60, 30);
-    sunLight.castShadow = true;
-    // 1024 on mobile prevents GPU driver OOM and WebGL context crash
-    sunLight.shadow.mapSize.width = isMobile ? 1024 : 2048;
-    sunLight.shadow.mapSize.height = isMobile ? 1024 : 2048;
+    sunLight.castShadow = !isMobile;
+    sunLight.shadow.mapSize.width = 2048;
+    sunLight.shadow.mapSize.height = 2048;
     const d = 55;
     sunLight.shadow.camera.left = -d;
     sunLight.shadow.camera.right = d;
@@ -344,21 +347,48 @@ export class ThreeCampus {
     this.updateCameraPosition();
   }
 
+  private getGroundIntersection(screenX: number, screenY: number): THREE.Vector3 | null {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return null;
+    const ndcX = ((screenX - rect.left) / rect.width) * 2 - 1;
+    const ndcY = -((screenY - rect.top) / rect.height) * 2 + 1;
+
+    this.mouse.set(ndcX, ndcY);
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+    const target = new THREE.Vector3();
+    return this.raycaster.ray.intersectPlane(this.groundPlane, target);
+  }
+
+  private clampCameraTarget() {
+    const maxBound = 45;
+    this.camTarget.x = Math.max(-maxBound, Math.min(maxBound, this.camTarget.x));
+    this.camTarget.z = Math.max(-maxBound, Math.min(maxBound, this.camTarget.z));
+  }
+
   private setupEventListeners() {
     const el = this.renderer.domElement;
+    el.style.touchAction = "none";
+    el.style.userSelect = "none";
 
     el.addEventListener("pointerdown", (e) => {
+      try {
+        el.setPointerCapture(e.pointerId);
+      } catch {}
+
       this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      this.panVelocity = { x: 0, z: 0 }; // Instantly halt any fling inertia on touch
 
       if (this.activePointers.size === 1) {
         this.isDragging = true;
-        this.prevPointer = { x: e.clientX, y: e.clientY };
         this.pointerDownPos = { x: e.clientX, y: e.clientY };
+        this.lastGroundPos = this.getGroundIntersection(e.clientX, e.clientY);
+        this.lastMoveTime = performance.now();
       } else if (this.activePointers.size === 2) {
-        // Pinch-to-zoom init
+        // Pinch-to-zoom + pan init
         this.isDragging = false;
         const pts = Array.from(this.activePointers.values());
         this.prevPinchDist = Math.hypot(pts[0]!.x - pts[1]!.x, pts[0]!.y - pts[1]!.y);
+        this.prevPinchMid = { x: (pts[0]!.x + pts[1]!.x) / 2, y: (pts[0]!.y + pts[1]!.y) / 2 };
       }
     });
 
@@ -367,66 +397,119 @@ export class ThreeCampus {
         this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       }
 
-      // Handle touch 2-finger pinch to zoom
+      // 1. Multi-touch: 2-finger smooth pinch-to-zoom and midpoint pan
       if (this.activePointers.size >= 2) {
         const pts = Array.from(this.activePointers.values());
-        const dist = Math.hypot(pts[0]!.x - pts[1]!.x, pts[0]!.y - pts[1]!.y);
-        if (this.prevPinchDist > 0 && Math.abs(dist - this.prevPinchDist) > 1.5) {
-          const factor = this.prevPinchDist / dist;
+        const currentDist = Math.hypot(pts[0]!.x - pts[1]!.x, pts[0]!.y - pts[1]!.y);
+        const midX = (pts[0]!.x + pts[1]!.x) / 2;
+        const midY = (pts[0]!.y + pts[1]!.y) / 2;
+
+        if (this.prevPinchDist > 0 && currentDist > 5) {
+          const ratio = this.prevPinchDist / currentDist;
+          // Smooth zoom damping: avoid extreme jumps
+          const factor = Math.max(0.92, Math.min(1.08, 1 + (ratio - 1) * 0.85));
           this.setZoom(factor);
-          this.prevPinchDist = dist;
+          this.prevPinchDist = currentDist;
         }
+
+        if (this.prevPinchMid) {
+          const prevMidGround = this.getGroundIntersection(this.prevPinchMid.x, this.prevPinchMid.y);
+          const currMidGround = this.getGroundIntersection(midX, midY);
+          if (prevMidGround && currMidGround) {
+            this.camTarget.x += prevMidGround.x - currMidGround.x;
+            this.camTarget.z += prevMidGround.z - currMidGround.z;
+            this.clampCameraTarget();
+            this.updateCameraPosition();
+          }
+        }
+        this.prevPinchMid = { x: midX, y: midY };
         return;
       }
 
-      // Handle room movement preview
+      // 2. Room movement phantom preview
       if (this.movingRoomId && this.currentGame) {
         this.updatePhantomRoomPreview(e);
       }
 
+      // 3. Single-finger / Mouse 1:1 Pixel-Perfect Ground-Locked Panning
       if (!this.isDragging) return;
 
-      const dx = e.clientX - this.prevPointer.x;
-      const dy = e.clientY - this.prevPointer.y;
-      this.prevPointer = { x: e.clientX, y: e.clientY };
+      const now = performance.now();
+      const dt = Math.max(0.001, (now - this.lastMoveTime) / 1000);
+      this.lastMoveTime = now;
 
-      const factor = (this.currentZoom / this.container.clientHeight) * 1.35;
-      let moveX = 0;
-      let moveZ = 0;
+      const currentGround = this.getGroundIntersection(e.clientX, e.clientY);
+      if (currentGround && this.lastGroundPos) {
+        const deltaX = this.lastGroundPos.x - currentGround.x;
+        const deltaZ = this.lastGroundPos.z - currentGround.z;
 
-      // Quadrant-aware panning
-      if (this.camAngleIndex === 0) {
-        moveX = (-dx + dy) * 0.7071 * factor;
-        moveZ = (-dx - dy) * 0.7071 * factor;
-      } else if (this.camAngleIndex === 1) {
-        moveX = (-dx - dy) * 0.7071 * factor;
-        moveZ = (dx - dy) * 0.7071 * factor;
-      } else if (this.camAngleIndex === 2) {
-        moveX = (dx - dy) * 0.7071 * factor;
-        moveZ = (dx + dy) * 0.7071 * factor;
-      } else {
-        moveX = (dx + dy) * 0.7071 * factor;
-        moveZ = (-dx + dy) * 0.7071 * factor;
+        this.camTarget.x += deltaX;
+        this.camTarget.z += deltaZ;
+        this.clampCameraTarget();
+        this.updateCameraPosition();
+
+        // Calculate velocity for smooth fling momentum
+        const vx = deltaX / dt;
+        const vz = deltaZ / dt;
+        this.panVelocity = {
+          x: this.panVelocity.x * 0.35 + vx * 0.65,
+          z: this.panVelocity.z * 0.35 + vz * 0.65,
+        };
+
+        // Re-read ground position after moving camera so subsequent movement remains locked
+        const newGround = this.getGroundIntersection(e.clientX, e.clientY);
+        if (newGround) {
+          this.lastGroundPos.copy(newGround);
+        }
+      } else if (currentGround) {
+        this.lastGroundPos = currentGround.clone();
       }
-
-      this.camTarget.x += moveX;
-      this.camTarget.z += moveZ;
-      this.updateCameraPosition();
     });
 
     const onPointerEnd = (e: PointerEvent) => {
+      try {
+        el.releasePointerCapture(e.pointerId);
+      } catch {}
+
       this.activePointers.delete(e.pointerId);
-      if (this.activePointers.size < 2) {
+
+      if (this.activePointers.size === 1) {
+        // Seamlessly continue 1-finger drag when lifting one finger from pinch
+        const remaining = Array.from(this.activePointers.values())[0]!;
+        this.lastGroundPos = this.getGroundIntersection(remaining.x, remaining.y);
+        this.isDragging = true;
+        this.lastMoveTime = performance.now();
         this.prevPinchDist = 0;
+        this.prevPinchMid = null;
+        return;
       }
-      if (!this.isDragging) return;
-      this.isDragging = false;
-      const dist = Math.hypot(e.clientX - this.pointerDownPos.x, e.clientY - this.pointerDownPos.y);
-      if (dist < 6) {
-        this.handleClick(e);
+
+      if (this.activePointers.size === 0) {
+        this.prevPinchDist = 0;
+        this.prevPinchMid = null;
+
+        if (this.isDragging) {
+          this.isDragging = false;
+          const dist = Math.hypot(e.clientX - this.pointerDownPos.x, e.clientY - this.pointerDownPos.y);
+          // High-DPI touch devices have fingertip jitter; allow 16px tap threshold vs 7px on mouse
+          const isTouch = e.pointerType === "touch";
+          const tapThreshold = isTouch ? 16 : 7;
+
+          if (dist < tapThreshold) {
+            this.panVelocity = { x: 0, z: 0 };
+            this.handleClick(e);
+          } else {
+            // Cap fling speed so map stays within comfortable viewing range
+            const maxSpeed = 30;
+            this.panVelocity.x = Math.max(-maxSpeed, Math.min(maxSpeed, this.panVelocity.x));
+            this.panVelocity.z = Math.max(-maxSpeed, Math.min(maxSpeed, this.panVelocity.z));
+          }
+        }
       }
     };
 
+    el.addEventListener("pointerup", onPointerEnd);
+    el.addEventListener("pointercancel", onPointerEnd);
     window.addEventListener("pointerup", onPointerEnd);
     window.addEventListener("pointercancel", onPointerEnd);
 
@@ -747,7 +830,13 @@ export class ThreeCampus {
     group.add(booth);
 
     // Glass windows
-    const glassMat = new THREE.MeshPhysicalMaterial({ color: 0x38bdf8, roughness: 0.1, transmission: 0.85, transparent: true });
+    const glassMat = new THREE.MeshStandardMaterial({
+      color: 0x38bdf8,
+      roughness: 0.1,
+      metalness: 0.1,
+      transparent: true,
+      opacity: 0.55,
+    });
     const windowMesh = new THREE.Mesh(new THREE.BoxGeometry(1.64, 0.6, 1.44), glassMat);
     windowMesh.position.set(-0.6, 1.05, 0);
     group.add(windowMesh);
@@ -1618,13 +1707,12 @@ export class ThreeCampus {
     });
 
     // Double-glazed Flush Viewing Glass
-    const windowGlassMat = new THREE.MeshPhysicalMaterial({
+    const windowGlassMat = new THREE.MeshStandardMaterial({
       color: 0xcffafe,
-      transmission: 0.86,
-      opacity: 1,
       transparent: true,
-      roughness: 0.06,
-      ior: 1.45,
+      opacity: 0.45,
+      roughness: 0.08,
+      metalness: 0.15,
     });
 
     // Overhead Cleanroom Recessed LED Troffer Light (illumination glow)
@@ -2040,7 +2128,13 @@ export class ThreeCampus {
     // 3. Sliding glass airlock doors (partially parted)
     const glassDoorL = new THREE.Mesh(
       new THREE.BoxGeometry(0.5, 1.22, 0.03),
-      new THREE.MeshPhysicalMaterial({ color: 0xcffafe, transmission: 0.85, transparent: true, roughness: 0.08 })
+      new THREE.MeshStandardMaterial({
+        color: 0xcffafe,
+        transparent: true,
+        opacity: 0.5,
+        roughness: 0.1,
+        metalness: 0.1,
+      })
     );
     glassDoorL.position.set(-0.24, 0.63, 0);
     portalGroup.add(glassDoorL);
@@ -2283,7 +2377,7 @@ export class ThreeCampus {
         for (let i = 0; i < 3; i++) {
           const bottle = new THREE.Mesh(
             new THREE.CylinderGeometry(0.06, 0.06, 0.16, 8),
-            new THREE.MeshPhysicalMaterial({ color: 0xe0f2fe, transmission: 0.8, transparent: true })
+            new THREE.MeshStandardMaterial({ color: 0xe0f2fe, transparent: true, opacity: 0.6, roughness: 0.1 })
           );
           bottle.position.set(-0.16 + i * 0.16, 0.96 + level * 0.12, 0);
           group.add(bottle);
@@ -2300,7 +2394,7 @@ export class ThreeCampus {
 
       const sash = new THREE.Mesh(
         new THREE.PlaneGeometry(0.72, 0.56),
-        new THREE.MeshPhysicalMaterial({ color: 0x93c5fd, transmission: 0.88, transparent: true, roughness: 0.05 })
+        new THREE.MeshStandardMaterial({ color: 0x93c5fd, transparent: true, opacity: 0.55, roughness: 0.08 })
       );
       sash.position.set(0, 0.52, 0.3);
       group.add(sash);
@@ -2549,7 +2643,7 @@ export class ThreeCampus {
     // Safety Goggles Translucent Visor
     const goggles = new THREE.Mesh(
       new THREE.BoxGeometry(0.16, 0.05, 0.08),
-      new THREE.MeshPhysicalMaterial({ color: 0x38bdf8, transmission: 0.8, transparent: true, roughness: 0.1 })
+      new THREE.MeshStandardMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.65, roughness: 0.1 })
     );
     goggles.position.set(0, 0.69, 0.09);
     group.add(goggles);
@@ -2735,6 +2829,16 @@ export class ThreeCampus {
     const delta = Math.min((now - this.lastTime) / 1000, 0.1);
     this.lastTime = now;
     const time = (now - this.startTime) / 1000;
+
+    // Smooth fling inertia momentum when releasing finger
+    if (!this.isDragging && (Math.abs(this.panVelocity.x) > 0.02 || Math.abs(this.panVelocity.z) > 0.02)) {
+      this.camTarget.x += this.panVelocity.x * delta;
+      this.camTarget.z += this.panVelocity.z * delta;
+      this.clampCameraTarget();
+      this.updateCameraPosition();
+      this.panVelocity.x *= 0.88;
+      this.panVelocity.z *= 0.88;
+    }
 
     this.updateAnimations(delta, time);
     try {
