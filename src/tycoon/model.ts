@@ -904,6 +904,62 @@ export function removeRoom(g: Game, id: string) {
   return next;
 }
 
+export function canMoveRoom(g: Game, id: string, newC: number, newR: number): string | null {
+  const room = g.rooms.find((r) => r.id === id);
+  if (!room) return "Stanza non trovata.";
+  if (room.c === newC && room.r === newR) return "La stanza si trova già qui.";
+  const def = roomDef(room.type);
+  const w = room.w;
+  const h = room.h;
+
+  for (let rr = newR; rr < newR + h; rr++) {
+    for (let cc = newC; cc < newC + w; cc++) {
+      const tile = g.tiles[rr]?.[cc];
+      const parcel = parcelAt(cc, rr);
+      if (!tile || !parcel) return "Esce dalla mappa.";
+      if (!g.owned.includes(parcel.id)) return "Il lotto non è tuo.";
+      if (!def.parcels.includes(parcel.id)) {
+        return `Questa stanza richiede il lotto ${def.parcels.map((pid) => PARCELS.find((p) => p.id === pid)?.name ?? pid).join(" o ")}.`;
+      }
+      if (tile.ground === "garden") return "Non puoi costruire sul giardino.";
+      if (tile.corridor) return "Spazio occupato da un corridoio.";
+      if (tile.roomId && tile.roomId !== id) return "Spazio occupato da un'altra stanza.";
+    }
+  }
+  return null;
+}
+
+export function moveRoom(g: Game, id: string, newC: number, newR: number): Game | string {
+  const err = canMoveRoom(g, id, newC, newR);
+  if (err) return err;
+  const next = structuredClone(g) as Game;
+  const room = next.rooms.find((r) => r.id === id);
+  if (!room) return "Stanza assente.";
+  const def = roomDef(room.type);
+
+  // Clear old room tiles
+  for (const t of roomTiles(room)) {
+    if (next.tiles[t.r]?.[t.c]?.roomId === id) {
+      next.tiles[t.r]![t.c]!.roomId = null;
+    }
+  }
+
+  // Update position
+  room.c = newC;
+  room.r = newR;
+
+  // Set new room tiles
+  for (const t of roomTiles(room)) {
+    next.tiles[t.r]![t.c]!.roomId = room.id;
+  }
+
+  pushLog(next, `${def.name} ricollocata nella nuova posizione.`, "good");
+  if (!roomOnline(next, room)) {
+    pushLog(next, `${def.name} non è collegata alla direzione.`, "bad");
+  }
+  return next;
+}
+
 export function canExpand(g: Game, id: string) {
   const room = g.rooms.find((r) => r.id === id);
   if (!room) return "Stanza assente.";

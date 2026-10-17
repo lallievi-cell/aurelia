@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, Box, Building2, Droplets, FastForward, FlaskConical, GitBranch, Globe2, Landmark, Map as MapIcon, Minus, PackageCheck, Pause, Play, Plus, Radio, ScrollText, Users, X, Zap } from "lucide-react";
+import { ArrowLeft, Box, Building2, Droplets, FastForward, FlaskConical, GitBranch, Globe2, Landmark, Map as MapIcon, Minus, Move, PackageCheck, Pause, Play, Plus, Radio, ScrollText, Users, X, Zap } from "lucide-react";
 import { blip, unlockAudio, soundClick, soundCash, soundSuccess, soundLevelUp } from "@/tycoon/audio";
 import { Campus3D } from "@/components/Campus3D";
 import { drawCampus, fitZoom, loadCampusArt, pickSign, pickTile, cameraBounds, type Cam } from "@/tycoon/draw";
@@ -30,6 +30,7 @@ import {
   canCorridor,
   canExpand,
   canInstall,
+  canMoveRoom,
   canPlace,
   capOf,
   coverage,
@@ -60,6 +61,7 @@ import {
   masteryCost,
   masteryGate,
   matPrice,
+  moveRoom,
   newGame,
   orderMat,
   payroll,
@@ -143,6 +145,7 @@ export function AureliaGame() {
   const [focus, setFocus] = useState<Focus>("sintesi");
   const [cell, setCell] = useState<{ c: number; r: number } | null>(null);
   const [roomId, setRoomId] = useState<string | null>(null);
+  const [movingRoomId, setMovingRoomId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState<1 | 2 | 4>(1);
@@ -154,6 +157,8 @@ export function AureliaGame() {
   const gameRef = useRef<Game | null>(null);
   const cellRef = useRef<{ c: number; r: number } | null>(null);
   const drag = useRef({ x: 0, y: 0, panX: 0, panY: 0, moved: false, active: false });
+  const touchMap = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const lastPinchDist = useRef<number>(0);
   gameRef.current = game;
   cellRef.current = cell;
 
@@ -263,6 +268,13 @@ export function AureliaGame() {
   }
 
   function onPointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
+    touchMap.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (touchMap.current.size >= 2) {
+      const pts = Array.from(touchMap.current.values());
+      lastPinchDist.current = Math.hypot(pts[0]!.x - pts[1]!.x, pts[0]!.y - pts[1]!.y);
+      drag.current.moved = true;
+      return;
+    }
     drag.current = { x: e.clientX, y: e.clientY, panX: cam.current.panX, panY: cam.current.panY, moved: false, active: true };
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
@@ -271,6 +283,18 @@ export function AureliaGame() {
     }
   }
   function onPointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
+    touchMap.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (touchMap.current.size >= 2) {
+      drag.current.moved = true;
+      const pts = Array.from(touchMap.current.values());
+      const dist = Math.hypot(pts[0]!.x - pts[1]!.x, pts[0]!.y - pts[1]!.y);
+      if (lastPinchDist.current > 0 && Math.abs(dist - lastPinchDist.current) > 2) {
+        const factor = dist / lastPinchDist.current;
+        zoomBy(cam.current, canvasRef.current, game!, factor);
+        lastPinchDist.current = dist;
+      }
+      return;
+    }
     if (!drag.current.active) return;
     const dx = e.clientX - drag.current.x;
     const dy = e.clientY - drag.current.y;
@@ -280,6 +304,10 @@ export function AureliaGame() {
     cam.current.panY = drag.current.panY + dy;
   }
   function onPointerUp(e: React.PointerEvent<HTMLCanvasElement>) {
+    touchMap.current.delete(e.pointerId);
+    if (touchMap.current.size < 2) {
+      lastPinchDist.current = 0;
+    }
     drag.current.active = false;
     if (!game || drag.current.moved) return;
     const rect = e.currentTarget.getBoundingClientRect();
@@ -539,11 +567,14 @@ export function AureliaGame() {
               game={game}
               selectedRoomId={roomId}
               selectedCell={cell}
+              movingRoomId={movingRoomId}
               onSelectRoom={(id) => {
+                if (movingRoomId) return;
                 setRoomId(id);
                 setCell(null);
               }}
               onSelectTile={(hit) => {
+                if (movingRoomId) return;
                 const tile = game.tiles[hit.r]?.[hit.c];
                 if (tile?.ground === "garden") {
                   setToast("Il cortile resta verde.");
@@ -558,10 +589,58 @@ export function AureliaGame() {
                 setCell(hit);
               }}
               onSelectParcel={(parcelId) => {
+                if (movingRoomId) return;
                 const parcel = PARCELS.find((item) => item.id === parcelId);
                 if (!parcel) return;
                 setRoomId(null);
                 setCell({ c: parcel.c0, r: parcel.r0 });
+              }}
+              onMoveRoom={(idToMove, targetCell) => {
+                const res = moveRoom(game, idToMove, targetCell.c, targetCell.r);
+                if (typeof res === "string") {
+                  setToast(res);
+                  return;
+                }
+                soundSuccess();
+                apply(res);
+                setMovingRoomId(null);
+                setToast("Stanza ricollocata con successo!");
+              }}
+              onCancelMove={() => {
+                setMovingRoomId(null);
+                setToast("Spostamento stanza annullato.");
+              }}
+              onDemolishTile={(hit) => {
+                const tile = game.tiles[hit.r]?.[hit.c];
+                if (!tile) return;
+                if (tile.corridor) {
+                  soundCash();
+                  const res = removeCorridor(game, hit.c, hit.r);
+                  apply(res);
+                  setToast("Corridoio demolito (+4.000 €).");
+                  return;
+                }
+                if (tile.roomId) {
+                  const r = game.rooms.find((item) => item.id === tile.roomId);
+                  if (!r) return;
+                  if (r.type === "hq") {
+                    setToast("La direzione non può essere rimossa.");
+                    return;
+                  }
+                  if (r.slots.some((s) => s.item)) {
+                    setToast("Prima togli macchine e arredi dalla stanza.");
+                    return;
+                  }
+                  if (game.jobs.some((j) => j.roomId === r.id)) {
+                    setToast("C'è un lotto attivo in lavorazione.");
+                    return;
+                  }
+                  soundCash();
+                  const res = removeRoom(game, r.id);
+                  apply(res);
+                  if (roomId === r.id) setRoomId(null);
+                  setToast(`Guscio ${roomDef(r.type).name} demolito (+${euro(Math.round(roomDef(r.type).shell * 0.5))}).`);
+                }
               }}
               onToggle2D={() => setViewMode("2d")}
             />
@@ -573,6 +652,10 @@ export function AureliaGame() {
                 onPointerDown={onPointerDown}
                 onPointerMove={onPointerMove}
                 onPointerUp={onPointerUp}
+                onWheel={(e) => {
+                  e.preventDefault();
+                  zoomBy(cam.current, canvasRef.current, game, e.deltaY > 0 ? 0.9 : 1.1);
+                }}
               />
               <button
                 type="button"
@@ -675,7 +758,17 @@ export function AureliaGame() {
         ) : null}
         {tab === "map" && room ? (
           <Sheet title={roomDef(room.type).name} onClose={() => setRoomId(null)} back>
-            <RoomPanel game={game} id={room.id} apply={apply} close={() => setRoomId(null)} />
+            <RoomPanel
+              game={game}
+              id={room.id}
+              apply={apply}
+              close={() => setRoomId(null)}
+              onStartMove={(targetId) => {
+                setMovingRoomId(targetId);
+                setRoomId(null);
+                setToast("Modalità spostamento attiva: tocca una casella libera per ricollocare la stanza.");
+              }}
+            />
           </Sheet>
         ) : null}
       </main>
@@ -858,7 +951,19 @@ function BuildSheet({ game, c, r, apply, close, bought }: { game: Game; c: numbe
   );
 }
 
-function RoomPanel({ game, id, apply, close }: { game: Game; id: string; apply: (g: Game | string) => void; close: () => void }) {
+function RoomPanel({
+  game,
+  id,
+  apply,
+  close,
+  onStartMove,
+}: {
+  game: Game;
+  id: string;
+  apply: (g: Game | string) => void;
+  close: () => void;
+  onStartMove?: (id: string) => void;
+}) {
   const room = game.rooms.find((item) => item.id === id);
   const [pick, setPick] = useState<number | null>(null);
   useEffect(() => setPick(null), [id]);
@@ -953,6 +1058,19 @@ function RoomPanel({ game, id, apply, close }: { game: Game; id: string; apply: 
           Audit · 40 mila €
         </button>
       ) : null}
+      <button
+        type="button"
+        className="min-h-11 rounded-full bg-paper border border-line text-ink hover:border-teal hover:text-teal font-medium flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs active:scale-98"
+        onClick={() => {
+          soundClick();
+          onStartMove?.(id);
+          close();
+        }}
+      >
+        <Move className="h-4 w-4 text-teal" />
+        <span>Sposta stanza sulla mappa</span>
+      </button>
+
       {room.type !== "hq" ? (
         <button type="button" className="min-h-11 rounded-full border border-line text-mist hover:text-red-500 hover:border-red-400 transition-colors" onClick={() => { soundCash(); const result = removeRoom(game, id); apply(result); if (typeof result !== "string") close(); }}>
           Smonta il guscio vuoto
