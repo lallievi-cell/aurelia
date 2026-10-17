@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, Building2, Droplets, FastForward, FlaskConical, GitBranch, Globe2, Landmark, Map as MapIcon, Minus, PackageCheck, Pause, Play, Plus, Radio, ScrollText, Users, X, Zap } from "lucide-react";
+import { ArrowLeft, Box, Building2, Droplets, FastForward, FlaskConical, GitBranch, Globe2, Landmark, Map as MapIcon, Minus, PackageCheck, Pause, Play, Plus, Radio, ScrollText, Users, X, Zap } from "lucide-react";
 import { blip, unlockAudio, soundClick, soundCash, soundSuccess, soundLevelUp } from "@/tycoon/audio";
+import { Campus3D } from "@/components/Campus3D";
 import { drawCampus, fitZoom, loadCampusArt, pickSign, pickTile, cameraBounds, type Cam } from "@/tycoon/draw";
 import {
   AUTHORITIES,
@@ -147,6 +148,7 @@ export function AureliaGame() {
   const [speed, setSpeed] = useState<1 | 2 | 4>(1);
   const [indication, setIndication] = useState(INDICATIONS[0]!);
   const [armReset, setArmReset] = useState(false);
+  const [viewMode, setViewMode] = useState<"3d" | "2d">("3d");
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const cam = useRef<Cam>({ panX: 0, panY: 0, zoom: 1, user: false });
   const gameRef = useRef<Game | null>(null);
@@ -243,7 +245,7 @@ export function AureliaGame() {
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [booted, tab]);
+  }, [booted, tab, viewMode]);
 
   function found() {
     unlockAudio();
@@ -532,7 +534,57 @@ export function AureliaGame() {
 
       <main className="relative min-h-0 flex-1">
         {tab === "map" ? (
-          <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} />
+          viewMode === "3d" ? (
+            <Campus3D
+              game={game}
+              selectedRoomId={roomId}
+              selectedCell={cell}
+              onSelectRoom={(id) => {
+                setRoomId(id);
+                setCell(null);
+              }}
+              onSelectTile={(hit) => {
+                const tile = game.tiles[hit.r]?.[hit.c];
+                if (tile?.ground === "garden") {
+                  setToast("Il cortile resta verde.");
+                  return;
+                }
+                if (tile?.roomId) {
+                  setRoomId(tile.roomId);
+                  setCell(null);
+                  return;
+                }
+                setRoomId(null);
+                setCell(hit);
+              }}
+              onSelectParcel={(parcelId) => {
+                const parcel = PARCELS.find((item) => item.id === parcelId);
+                if (!parcel) return;
+                setRoomId(null);
+                setCell({ c: parcel.c0, r: parcel.r0 });
+              }}
+              onToggle2D={() => setViewMode("2d")}
+            />
+          ) : (
+            <div className="relative w-full h-full">
+              <canvas
+                ref={canvasRef}
+                className="absolute inset-0 h-full w-full touch-none"
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerUp}
+              />
+              <button
+                type="button"
+                onClick={() => setViewMode("3d")}
+                className="absolute top-3 right-3 flex items-center gap-1.5 bg-card/95 hover:bg-paper text-ink px-3 py-1.5 rounded-2xl border border-line/70 text-xs font-semibold shadow-md cursor-pointer transition-all active:scale-95 hover:border-teal z-10"
+                title="Passa alla vista 3D Three.js"
+              >
+                <Box className="h-3.5 w-3.5 text-teal" />
+                <span>Vista 3D</span>
+              </button>
+            </div>
+          )
         ) : (
           <div className="absolute inset-0 min-w-0 overflow-x-hidden overflow-y-auto px-4 py-4 pb-28">
             {tab === "deals" ? <Deals game={game} apply={apply} /> : null}
@@ -592,7 +644,7 @@ export function AureliaGame() {
           </div>
         ) : null}
 
-        {tab === "map" ? (
+        {tab === "map" && viewMode === "2d" ? (
           <div className="absolute right-3 bottom-3 flex flex-col gap-2">
             <button type="button" aria-label="Avvicina" className="grid h-11 w-11 place-items-center rounded-full border border-line bg-card shadow-md" onClick={() => zoomBy(cam.current, canvasRef.current, game, 1.12)}>
               <Plus />

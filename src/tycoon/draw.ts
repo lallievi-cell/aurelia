@@ -69,24 +69,6 @@ const NAME: Record<RoomType, string> = {
 
 const ART_OF: Partial<Record<RoomType, string>> = {
   hq: "hq",
-  gown: "qc",
-  warehouse: "warehouse",
-  quarantine: "warehouse",
-  cold: "cold",
-  shipping: "shipping",
-  pilot: "pilot",
-  plant: "plant",
-  pack: "shipping",
-  sterile: "sterile",
-  qc: "qc",
-  stability: "cold",
-  discovery: "discovery",
-  preclinical: "discovery",
-  phase1: "clinic",
-  phase23: "clinic",
-  regulatory: "regulatory",
-  power: "power",
-  water: "water",
 };
 
 const artImages = new Map<string, HTMLImageElement>();
@@ -993,8 +975,7 @@ export function drawCampus(ctx: CanvasRenderingContext2D, game: Game, viewW: num
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
         const tile = game.tiles[r]?.[c];
-        if (!tile || tile.roomId || tile.corridor) continue;
-        if ((c * 5 + r * 3) % 7 !== 0) continue;
+        if (!tile || tile.ground !== "garden" || tile.roomId || tile.corridor) continue;
         const parcel = PARCELS.find((p) => c >= p.c0 && c < p.c1 && r >= p.r0 && r < p.r1);
         if (!parcel || !game.owned.includes(parcel.id)) continue;
         stamps.push({
