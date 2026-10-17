@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, FlaskConical, GitBranch, Globe2, Map as MapIcon, Minus, Pause, Play, Plus, ScrollText, Users, X } from "lucide-react";
+import { ArrowLeft, Building2, FastForward, FlaskConical, GitBranch, Globe2, Landmark, Map as MapIcon, Minus, Pause, Play, Plus, Radio, ScrollText, Users, X } from "lucide-react";
 import { blip, unlockAudio } from "@/tycoon/audio";
 import { drawCampus, fitZoom, loadCampusArt, pickSign, pickTile, cameraBounds, type Cam } from "@/tycoon/draw";
 import {
@@ -95,6 +95,7 @@ import {
   TIER_LABEL,
   TRAIT_LABEL,
   TRAIT_NOTE,
+  resolveDecision,
   tick,
   train,
   trainCost,
@@ -119,6 +120,11 @@ import {
   type Stage,
 } from "@/tycoon/model";
 import { clearGame, loadGame, saveGame } from "@/tycoon/save";
+import { calculateEnterpriseValuation, currentRank } from "@/tycoon/valuation";
+import { fireConfetti } from "@/tycoon/celebrate";
+import { xpForSkill } from "@/tycoon/staff_xp";
+import { DecisionModal } from "@/components/DecisionModal";
+import { FinanceView } from "@/components/FinanceView";
 
 type Tab = "map" | "deals" | "research" | "tech" | "team" | "world";
 
@@ -138,17 +144,16 @@ export function AureliaGame() {
   const [roomId, setRoomId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
+  const [speed, setSpeed] = useState<1 | 2 | 4>(1);
   const [indication, setIndication] = useState(INDICATIONS[0]!);
   const [armReset, setArmReset] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const cam = useRef<Cam>({ panX: 0, panY: 0, zoom: 1, user: false });
   const gameRef = useRef<Game | null>(null);
   const cellRef = useRef<{ c: number; r: number } | null>(null);
-  const playRef = useRef(false);
   const drag = useRef({ x: 0, y: 0, panX: 0, panY: 0, moved: false, active: false });
   gameRef.current = game;
   cellRef.current = cell;
-  playRef.current = playing;
 
   useEffect(() => {
     loadCampusArt();
@@ -163,15 +168,62 @@ export function AureliaGame() {
     return () => window.clearTimeout(id);
   }, [toast]);
 
+  // Keyboard shortcuts (Space = play/pause, 1/2/4 = speed)
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.code === "Space") {
+        e.preventDefault();
+        unlockAudio();
+        setPlaying((p) => !p);
+      } else if (e.key === "1") {
+        setSpeed(1);
+      } else if (e.key === "2") {
+        setSpeed(2);
+      } else if (e.key === "3" || e.key === "4") {
+        setSpeed(4);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  // Dedicated tick loop responding to play and speed
+  useEffect(() => {
+    if (!booted || !playing || !game) return;
+    if (waitingProgram(game) || game.pendingDecision) return;
+
+    const intervalMs = speed === 4 ? 250 : speed === 2 ? 500 : 1000;
+    const timer = window.setInterval(() => {
+      setGame((prev) => {
+        if (!prev || waitingProgram(prev) || prev.pendingDecision) return prev;
+        const stepped = tick(prev);
+        if (stepped.pendingDecision) {
+          setPlaying(false);
+        }
+        if (
+          stepped.chapter !== prev.chapter ||
+          (stepped.achievements && stepped.achievements.length > (prev.achievements?.length ?? 0))
+        ) {
+          fireConfetti(true);
+        }
+        gameRef.current = stepped;
+        saveGame(stepped);
+        blip(460);
+        return stepped;
+      });
+    }, intervalMs);
+
+    return () => window.clearInterval(timer);
+  }, [booted, playing, speed, game?.week, game?.pendingDecision]);
+
   useEffect(() => {
     if (!booted || tab !== "map") return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     let raf = 0;
     let last = performance.now();
-    let acc = 0;
     const frame = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
       const rect = canvas.getBoundingClientRect();
       const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -186,17 +238,6 @@ export function AureliaGame() {
       if (ctx && current && rect.width > 0) {
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         drawCampus(ctx, current, rect.width, rect.height, cam.current, now / 1000, cellRef.current);
-      }
-      if (playRef.current && current && !waitingProgram(current)) {
-        acc += dt;
-        if (acc >= 1.05) {
-          acc = 0;
-          const stepped = tick(current);
-          gameRef.current = stepped;
-          saveGame(stepped);
-          setGame(stepped);
-          blip(460);
-        }
       }
       raf = requestAnimationFrame(frame);
     };
@@ -299,34 +340,83 @@ export function AureliaGame() {
   }
 
   const room = game.rooms.find((item) => item.id === roomId) ?? null;
+  const valInfo = calculateEnterpriseValuation(game);
+  const lastNet = game.lastWeekSummary?.net ?? 0;
 
   return (
     <div className="flex h-dvh flex-col bg-paper text-ink">
-      <header className="hud safe-top z-20 flex items-end gap-2 px-3 pb-2">
-        <img src={`${import.meta.env.BASE_URL}aurelia/crest.png`} alt="" className="mb-0.5 h-11 w-11 shrink-0 rounded-full shadow-md" />
-        <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-semibold tracking-[0.16em] text-teal uppercase">{game.chapter}</p>
-          <p className="truncate font-display text-2xl leading-none">{game.name}</p>
-          <p className="text-xs text-mist">anno {yearOf(game.week)}</p>
+      <header className="hud safe-top z-20 flex items-center justify-between gap-1.5 px-3 pb-2">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <img src={`${import.meta.env.BASE_URL}aurelia/crest.png`} alt="" className="h-10 w-10 shrink-0 rounded-full shadow-md" />
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <p className="text-[10px] font-semibold tracking-[0.16em] text-teal uppercase">{game.chapter}</p>
+              <button
+                type="button"
+                onClick={() => setTab("world")}
+                className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-card border border-line text-[10px] font-semibold text-ink hover:border-teal cursor-pointer"
+                title="Valutazione e Grado d'Impresa"
+              >
+                <Building2 className="h-2.5 w-2.5 text-teal" />
+                <span>{currentRank(valInfo.total).title}</span>
+              </button>
+            </div>
+            <p className="truncate font-display text-xl leading-none">{game.name}</p>
+            <p className="text-[11px] text-mist">anno {yearOf(game.week)}</p>
+          </div>
         </div>
-        <div className="cash px-3 py-1.5 text-right">
-          <p className="font-display text-lg leading-none">{euro(game.cash)}</p>
-          <p className="text-[10px] text-foam/70">sett. {game.week}</p>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          <div
+            className="cash px-2.5 py-1 text-right cursor-pointer hover:opacity-90 transition-opacity"
+            onClick={() => setTab("world")}
+            title="Apri Bilancio & Finanza"
+          >
+            <p className="font-display text-base leading-none">{euro(game.cash)}</p>
+            <div className="flex items-center justify-end gap-1 text-[10px]">
+              <span className={`font-semibold ${lastNet >= 0 ? "text-emerald-400" : "text-amber-300"}`}>
+                {lastNet >= 0 ? "+" : ""}{euro(lastNet)}/s
+              </span>
+              <span className="text-foam/60">· s.{game.week}</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            aria-label="Avanza di una settimana"
+            onClick={() => apply(tick(game))}
+            className="grid h-10 w-10 place-items-center rounded-full bg-amber text-ink shadow-sm hover:opacity-90 active:scale-95 cursor-pointer"
+          >
+            <Plus className="h-5 w-5" />
+          </button>
+
+          <button
+            type="button"
+            aria-label={playing ? "Metti in pausa" : "Fai scorrere le settimane"}
+            onClick={() => {
+              unlockAudio();
+              setPlaying((v) => !v);
+            }}
+            className={`grid h-10 w-10 place-items-center rounded-full shadow-sm hover:opacity-90 active:scale-95 cursor-pointer ${
+              playing ? "bg-amber text-ink" : "bg-ink text-card"
+            }`}
+          >
+            {playing ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+          </button>
+
+          <button
+            type="button"
+            title="Velocità (1x, 2x, 4x - tasti 1, 2, 4)"
+            onClick={() => {
+              unlockAudio();
+              setSpeed((s) => (s === 1 ? 2 : s === 2 ? 4 : 1));
+            }}
+            className="h-10 px-2 rounded-full border border-line bg-card flex items-center gap-0.5 text-xs font-bold text-ink hover:border-teal active:scale-95 cursor-pointer"
+          >
+            <FastForward className="h-3.5 w-3.5 text-teal" />
+            <span>{speed}x</span>
+          </button>
         </div>
-        <button type="button" aria-label="Avanza di una settimana" onClick={() => apply(tick(game))} className="grid h-11 w-11 place-items-center rounded-full bg-amber text-ink shadow-sm">
-          <Plus />
-        </button>
-        <button
-          type="button"
-          aria-label={playing ? "Metti in pausa" : "Fai scorrere le settimane"}
-          onClick={() => {
-            unlockAudio();
-            setPlaying((v) => !v);
-          }}
-          className="grid h-11 w-11 place-items-center rounded-full bg-ink text-card shadow-sm"
-        >
-          {playing ? <Pause /> : <Play />}
-        </button>
       </header>
       <div className="grid grid-cols-4 gap-1.5 border-b border-line bg-paper/80 px-2 py-1.5">
         <span className="meter"><i className="bg-teal" />API {game.api}/{capOf(game, "api")}</span>
@@ -334,6 +424,22 @@ export function AureliaGame() {
         <button type="button" className="meter" onClick={() => setToast(scienceHint(game))}><i className="bg-ink" />Sci {Math.floor(game.science)}</button>
         <span className="meter"><i className="bg-mist" />kW {power?.demand}/{power?.supply}</span>
       </div>
+
+      {game.log.length > 0 && (
+        <div
+          onClick={() => setTab("world")}
+          className="flex items-center gap-2 border-b border-line/60 bg-paper/95 px-3 py-1 text-xs text-mist cursor-pointer hover:bg-card transition-colors overflow-hidden"
+          title="Clicca per aprire il registro completo"
+        >
+          <span className="shrink-0 font-bold uppercase tracking-wider text-[10px] text-teal flex items-center gap-1">
+            <Radio className="h-3 w-3 text-amber animate-pulse" /> Notizie
+          </span>
+          <span className="truncate text-ink">
+            <strong className="text-mist font-normal">s.{game.log[0]?.week} · </strong>
+            {game.log[0]?.text}
+          </span>
+        </div>
+      )}
 
       <main className="relative min-h-0 flex-1">
         {tab === "map" ? (
@@ -345,7 +451,7 @@ export function AureliaGame() {
             {tab === "tech" ? <TechTree game={game} apply={apply} /> : null}
             {tab === "team" ? <Team game={game} apply={apply} /> : null}
             {tab === "world" ? (
-              <World
+              <FinanceView
                 game={game}
                 apply={apply}
                 armReset={armReset}
@@ -364,6 +470,16 @@ export function AureliaGame() {
               />
             ) : null}
           </div>
+        )}
+
+        {game.pendingDecision && (
+          <DecisionModal
+            game={game}
+            decision={game.pendingDecision}
+            onSelect={(choiceId) => {
+              apply(resolveDecision(game, choiceId));
+            }}
+          />
         )}
 
         {game.lesson < LESSONS.length ? (
@@ -429,7 +545,13 @@ export function AureliaGame() {
         <Nav icon={<FlaskConical />} label="Ricerca" on={tab === "research"} click={() => setTab("research")} dot={game.pipeline.some((item) => item.waiting)} />
         <Nav icon={<GitBranch />} label="Tecniche" on={tab === "tech"} click={() => setTab("tech")} dot={TECH.some((tech) => !hasTech(game, tech.id) && !techGate(game, tech.id))} />
         <Nav icon={<Users />} label="Persone" on={tab === "team"} click={() => setTab("team")} dot={peopleWaiting(game)} />
-        <Nav icon={<Globe2 />} label="Mondo" on={tab === "world"} click={() => setTab("world")} />
+        <Nav
+          icon={<Landmark />}
+          label="Finanza"
+          on={tab === "world"}
+          click={() => setTab("world")}
+          dot={Boolean(game.pendingDecision || (game.finance && game.finance.loan > 0))}
+        />
       </nav>
     </div>
   );
@@ -1220,7 +1342,25 @@ function Team({ game, apply }: { game: Game; apply: (g: Game | string) => void }
               </div>
               <button type="button" className="min-h-11 shrink-0 rounded-full px-2 text-sm text-mist" onClick={() => apply(dismiss(game, member.id))}>Esci · {euro(member.salary * 2)}</button>
             </div>
-            <div className="mt-2"><Pips n={member.skill} /></div>
+            <div className="mt-2 flex items-center justify-between">
+              <Pips n={member.skill} />
+              <div className="flex items-center gap-1.5">
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                  (member.morale ?? 75) >= 70 ? "bg-teal/15 text-teal" : (member.morale ?? 75) >= 40 ? "bg-amber/15 text-amber" : "bg-red-500/15 text-red-600"
+                }`}>
+                  Morale: {member.morale ?? 75}%
+                </span>
+                <span className="text-[10px] text-mist font-medium">
+                  XP: {member.xp ?? 0}/{xpForSkill(member.skill)}
+                </span>
+              </div>
+            </div>
+            {member.veteran && (
+              <div className="mt-1.5 p-2 rounded-xl bg-amber/10 border border-amber/25 text-xs">
+                <span className="font-bold text-amber block">⭐ Tratto Veterano: {member.veteran.name}</span>
+                <span className="text-mist">{member.veteran.note}</span>
+              </div>
+            )}
             <p className="mt-2 text-sm">{dutyOf(game, member)}</p>
             <p className="text-sm text-mist">{TRAIT_NOTE[member.trait]}</p>
             <div className="mt-2 flex flex-wrap gap-1">
@@ -1265,51 +1405,6 @@ function Team({ game, apply }: { game: Game; apply: (g: Game | string) => void }
           </article>
         );
       })}
-    </div>
-  );
-}
-
-function World({ game, apply, armReset, reset }: { game: Game; apply: (g: Game | string) => void; armReset: boolean; reset: () => void }) {
-  const max = Math.max(...game.history);
-  const min = Math.min(...game.history);
-  return (
-    <div className="mx-auto grid max-w-lg gap-4">
-      <h2 className="font-display text-3xl">Mondo</h2>
-      <p className="text-sm text-mist">Reputazione {Math.round(game.reputation)} · qualità {Math.round(game.quality)} · quota {Math.round(game.playerShare)}% · copertura {Math.round(coverage(game))}</p>
-      <p className="text-sm text-mist">{siteRead(game)}</p>
-      <p className="text-sm text-mist">Materie {euro(matPrice(game, "api"))} l'API · domanda {Math.round(demandOf(game))}{game.mod ? ` · ${game.mod.label}` : ""}</p>
-      <div className="flex h-16 items-end gap-1 rounded-xl bg-card px-3 py-2">
-        {game.history.map((value, index) => {
-          const height = max === min ? 50 : ((value - min) / (max - min)) * 100;
-          return <div key={index} className="flex-1 rounded-sm bg-teal" style={{ height: `${Math.max(8, height)}%` }} />;
-        })}
-      </div>
-      {game.products.map((product) => (
-        <article key={product.id} className="rounded-xl border border-line bg-card p-3">
-          <p className="font-medium">{product.code} · {product.indication}</p>
-          <p className="text-sm text-mist">Prezzo {product.price}{product.patentLeft ? ` · brevetto ${product.patentLeft} sett.` : ""}</p>
-          <div className="mt-2 flex gap-2">
-            <button type="button" className="min-h-11 flex-1 rounded-full bg-paper" onClick={() => apply(setPrice(game, product.id, product.price - 5))}>Abbassa</button>
-            <button type="button" className="min-h-11 flex-1 rounded-full bg-paper" onClick={() => apply(setPrice(game, product.id, product.price + 5))}>Alza</button>
-          </div>
-        </article>
-      ))}
-      {game.rivals.map((rival) => (
-        <article key={rival.id} className="rounded-xl bg-card px-3 py-2">
-          <div className="flex justify-between"><p className="font-medium">{rival.name}</p><p className="font-display">{Math.round(rival.share)}%</p></div>
-          <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-line"><div className="h-full rounded-full bg-ink" style={{ width: `${Math.min(100, (rival.share / 50) * 100)}%` }} /></div>
-          <p className="mt-1 text-sm text-mist">{rival.note}{rival.share > game.reputation * 0.65 ? " Ti tiene sotto pressione." : ""}</p>
-        </article>
-      ))}
-      <h3 className="font-display text-2xl">Registro</h3>
-      <ul className="grid gap-2">
-        {game.log.slice(0, 14).map((item, index) => (
-          <li key={index} className="text-sm leading-snug"><span className="text-mist">s{item.week} · </span>{item.text}</li>
-        ))}
-      </ul>
-      <button type="button" className="min-h-11 rounded-full border border-line text-mist" onClick={reset}>
-        {armReset ? "Conferma: chiudi l'azienda" : "Nuova azienda"}
-      </button>
     </div>
   );
 }

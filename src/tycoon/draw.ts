@@ -1,4 +1,5 @@
 import { COLS, ROWS, PARCELS, anchorTiles, euro, hasTech, powerReport, roomOnline, roomTiles, type Game, type Room, type RoomType } from "@/tycoon/model";
+import { getActiveFloating } from "@/tycoon/floating";
 
 export const PAL = {
   ink: "#12262c",
@@ -1037,5 +1038,30 @@ export function drawCampus(ctx: CanvasRenderingContext2D, game: Game, viewW: num
     }
   }
   drawParcelSigns(ctx, game, m, viewW, viewH);
+
+  // Floating feedback numbers and alerts
+  const activeFloating = getActiveFloating();
+  for (const { item, progress } of activeFloating) {
+    const pos = tilePos(item.c, item.r, m);
+    const yDrift = Math.pow(progress, 0.7) * 48;
+    const alpha = progress < 0.15 ? progress / 0.15 : progress > 0.65 ? (1 - progress) / 0.35 : 1;
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+    ctx.font = "bold 15px Outfit, Trebuchet MS, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.strokeStyle = "rgba(18,38,44,0.92)";
+    ctx.lineWidth = 3.5;
+    ctx.strokeText(item.text, pos.x, pos.y - yDrift - 18);
+
+    ctx.fillStyle =
+      item.tone === "good" ? "#10b981" :
+      item.tone === "gold" ? "#f59e0b" :
+      item.tone === "bad" ? "#ef4444" :
+      item.tone === "science" ? "#38bdf8" : "#f7fbf9";
+    ctx.fillText(item.text, pos.x, pos.y - yDrift - 18);
+    ctx.restore();
+  }
+
   drawVignette(ctx, viewW, viewH);
 }

@@ -1,3 +1,11 @@
+import { type WeekLedger, createEmptyLedger, finalizeLedger } from "@/tycoon/ledger";
+import { addFloating } from "@/tycoon/floating";
+import { type FinanceState, initialFinanceState, calculateCreditRating } from "@/tycoon/finance";
+import { type DecisionEvent, DECISION_EVENTS } from "@/tycoon/events";
+import { type VeteranPerk, grantStaffWorkXP } from "@/tycoon/staff_xp";
+import { calculateEnterpriseValuation, currentRank, RANKS } from "@/tycoon/valuation";
+import { ACHIEVEMENTS_LIST } from "@/tycoon/achievements";
+
 export const COLS = 20;
 export const ROWS = 16;
 
@@ -88,7 +96,19 @@ export type Room = {
 };
 export type Tile = { corridor: boolean; roomId: string | null; ground: "lot" | "garden" };
 export type Trait = "preciso" | "svelto" | "curioso" | "calmo" | "chiaro" | "negoziatore";
-export type Staff = { id: string; name: string; role: Role; skill: number; salary: number; roomId: string | null; trait: Trait; leave: number };
+export type Staff = {
+  id: string;
+  name: string;
+  role: Role;
+  skill: number;
+  salary: number;
+  roomId: string | null;
+  trait: Trait;
+  leave: number;
+  xp?: number;
+  morale?: number;
+  veteran?: VeteranPerk;
+};
 export type Client = { id: string; name: string; trust: number; taste: Tier; note: string; last: number };
 export type Offer = {
   id: string;
@@ -183,9 +203,25 @@ export type Game = {
   playerShare: number;
   refinanced: boolean;
   nextEvent: number;
-  stats: { batches: number; revenue: number; approvals: number; launches: number; licenses: number };
+  stats: {
+    batches: number;
+    revenue: number;
+    approvals: number;
+    launches: number;
+    licenses: number;
+    highestValuation?: number;
+    totalWagesPaid?: number;
+    totalInterestPaid?: number;
+  };
   history: number[];
   lesson: number;
+  ledger?: WeekLedger[];
+  lastWeekSummary?: WeekLedger;
+  finance?: FinanceState;
+  pendingDecision?: DecisionEvent | null;
+  eventHistory?: string[];
+  achievements?: string[];
+  valuation?: number;
 };
 
 export type TechDef = { id: TechId; era: Era; branch: Branch; name: string; blurb: string; deep: string; cash: number; sci: number; need: TechId[] };
@@ -484,7 +520,7 @@ export function roll(seed: number) {
 export function yearOf(week: number) {
   return Math.floor((Math.max(1, week) - 1) / 52) + 1;
 }
-function clamp(n: number, a: number, b: number) {
+export function clamp(n: number, a: number, b: number) {
   return Math.max(a, Math.min(b, n));
 }
 function nid(g: Game, prefix: string) {
@@ -576,9 +612,15 @@ export function newGame(name: string, focus: Focus): Game {
     playerShare: 0,
     refinanced: false,
     nextEvent: 10,
-    stats: { batches: 0, revenue: 0, approvals: 0, launches: 0, licenses: 0 },
+    stats: { batches: 0, revenue: 0, approvals: 0, launches: 0, licenses: 0, highestValuation: 3_800_000, totalWagesPaid: 0, totalInterestPaid: 0 },
     history: [2_400_000],
     lesson: 0,
+    ledger: [],
+    finance: initialFinanceState(),
+    pendingDecision: null,
+    eventHistory: [],
+    achievements: [],
+    valuation: 3_800_000,
   };
   const hq: Room = { id: "hq", type: "hq", level: 1, c: 1, r: 1, w: 2, h: 2, expanded: false, halt: 0, slots: [{ item: { defId: "scrivania", level: 1 } }, { item: null }] };
   g.rooms.push(hq);
@@ -1415,6 +1457,8 @@ function patchJob(g: Game, j: Job) {
 }
 function patchPerson(s: Staff, hired: boolean, week: number) {
   s.trait ??= traitFor(s.role, s.name.length * 3 + s.skill);
+  s.xp ??= 0;
+  s.morale ??= 75;
   if (hired) s.leave = 0;
   else s.leave ??= week + 5;
 }
@@ -1437,6 +1481,12 @@ function heal(g: Game) {
     program.heat ??= 0;
     program.rivalId ??= null;
   }
+  g.ledger ??= [];
+  g.finance ??= initialFinanceState();
+  g.achievements ??= [];
+  g.eventHistory ??= [];
+  g.stats.highestValuation ??= g.valuation ?? 3_500_000;
+  g.valuation ??= 3_500_000;
 }
 export function sellerOn(g: Game) {
   return g.staff.some((s) => s.role === "commercial" && s.roomId && g.rooms.find((r) => r.id === s.roomId)?.type === "hq") && hasGear(g, "sala");
@@ -1701,7 +1751,7 @@ function add(g: Game, key: MatKey | "vials", n: number) {
   else if (key === "eccipient") g.eccipient += n;
   else g.vials += n;
 }
-function tryFill(g: Game, key: MatKey | "vials", need: number) {
+function tryFill(g: Game, key: MatKey | "vials", need: number, ledger?: WeekLedger) {
   if (need <= 0 || have(g, key) >= need) return true;
   if (!g.autoBuy) return false;
   const n = need - have(g, key);
@@ -1709,6 +1759,7 @@ function tryFill(g: Game, key: MatKey | "vials", need: number) {
   const cost = n * (key === "api" ? apiPrice(g) : matPrice(g, key));
   if (g.cash < cost) return false;
   g.cash -= cost;
+  if (ledger) ledger.expenses.materials += cost;
   add(g, key, n);
   return true;
 }
@@ -1744,7 +1795,7 @@ export function chainNote(g: Game, job: Job) {
   return releaseReady(g) ? "In rilascio. Il QC sta firmando." : "In quarantena. Serve il QC collegato, con un analista.";
 }
 
-function produce(g: Game) {
+function produce(g: Game, ledger?: WeekLedger) {
   heal(g);
   for (const job of g.jobs) {
     if (job.done >= job.batches || g.week <= job.due) continue;
@@ -1752,6 +1803,7 @@ function produce(g: Game) {
     if (job.clauses.penalty && !job.lateHit) {
       const hit = Math.round(job.pay * 0.08);
       g.cash -= hit;
+      if (ledger) ledger.expenses.penalties += hit;
       job.lateHit = true;
       pushLog(g, `${job.client}: penale di ritardo ${euro(hit)}.`, "bad");
     } else if (g.week === job.due + 1) pushLog(g, `${job.client} è oltre la data.`, "bad");
@@ -1779,7 +1831,7 @@ function produce(g: Game) {
     const room = g.rooms.find((r) => r.id === job.roomId);
     const line = room ? lineOf(g, room) : null;
     if (!room || !line) continue;
-    const okMats = () => tryFill(g, "api", job.api) && tryFill(g, "solvent", job.solvent) && tryFill(g, "eccipient", job.eccipient) && tryFill(g, "vials", job.vials);
+    const okMats = () => tryFill(g, "api", job.api, ledger) && tryFill(g, "solvent", job.solvent, ledger) && tryFill(g, "eccipient", job.eccipient, ledger) && tryFill(g, "vials", job.vials, ledger);
     const proc = g.processes.find((item) => item.id === job.processId);
     const practiced = 1 + ((proc?.known ?? 0) / 100) * 0.15;
     const step = job.step ?? "reazione";
@@ -1836,9 +1888,11 @@ function produce(g: Game) {
         const client = g.clients.find((c) => c.id === job.clientId);
         if (client) client.trust = clamp(client.trust - 2, 0, 100);
         nudgeRival(g, 0.5);
+        addFloating("Scarto!", "bad", room.c, room.r);
         if (job.clauses.penalty && !job.penalScrap) {
           const hit = Math.round((job.pay / job.batches) * 0.4);
           g.cash -= hit;
+          if (ledger) ledger.expenses.penalties += hit;
           job.penalScrap = true;
           pushLog(g, `${job.client}: scarto con penale ${euro(hit)}.`, "bad");
         } else pushLog(g, `Lotto ${job.client} fuori specifica.`, "bad");
@@ -1854,6 +1908,17 @@ function produce(g: Game) {
         if (line.kind === "plant" && !("fill" in line && line.fill)) slice = Math.round(slice * 0.9);
         g.cash += slice;
         g.stats.revenue += slice;
+        if (ledger) ledger.revenue.batches += slice;
+        addFloating(`+${euro(slice)}`, "good", room.c, room.r);
+
+        for (const op of staffIn(g, room.id, "operator")) {
+          const res = grantStaffWorkXP(op, true);
+          if (res.leveledUp) {
+            pushLog(g, `${op.name} sale di livello con l'esperienza: abilità ${res.newSkill}!`, "good");
+            addFloating(`▲ ${op.name} L${res.newSkill}`, "gold", room.c, room.r);
+          }
+        }
+
         g.reputation = clamp(g.reputation + 0.5, 0, 100);
         g.quality = clamp(g.quality + 0.3, 0, 100);
         if (job.done >= job.batches) {
@@ -2236,6 +2301,7 @@ export function licenseOut(g: Game, id: string) {
   next.stats.licenses += 1;
   next.stats.revenue += pay;
   next.reputation = clamp(next.reputation + 3, 0, 100);
+  addFloating(`+${euro(pay)}`, "gold", 1, 1);
   pushLog(next, `${program.code} ceduta per ${euro(pay)}.`, "good");
   markGoals(next);
   return next;
@@ -2250,6 +2316,7 @@ export function launchProduct(g: Game, id: string) {
   const bump = Math.max(4, Math.round((hasTech(next, "lancio") ? 10 : 7) * marketMul(program)));
   next.playerShare = clamp(next.playerShare + bump, 0, shareCap(next));
   next.stats.launches += 1;
+  addFloating(`Lancio ${program.code}!`, "gold", 1, 1);
   pushLog(next, `${program.code} entra in commercio.`, "good");
   markGoals(next);
   refreshChapter(next);
@@ -2267,7 +2334,7 @@ export function setPrice(g: Game, id: string, price: number) {
   return next;
 }
 
-function commerce(g: Game) {
+function commerce(g: Game, ledger?: WeekLedger) {
   if (!g.products.length) return;
   const cap = shareCap(g);
   const ship = (hasGear(g, "baia") ? 1 : 0.75) * (hasMastery(g, "packaging") ? 1.05 : 1);
@@ -2280,26 +2347,62 @@ function commerce(g: Game) {
     const revenue = Math.round(g.playerShare * demandOf(g) * (product.price / 100) * 1100 * ship * serialOk * pandemic);
     g.cash += revenue;
     g.stats.revenue += revenue;
+    if (ledger) ledger.revenue.commerce += revenue;
+    const hq = g.rooms.find((r) => r.type === "hq") || g.rooms[0];
+    if (hq && revenue > 0 && g.week % 3 === 0) {
+      addFloating(`+${euro(revenue)}`, "good", hq.c, hq.r);
+    }
     if (product.patentLeft > 0) {
       product.patentLeft -= 1;
       if (product.patentLeft === 0) {
         g.playerShare = clamp(g.playerShare - 3, 0, cap);
-        pushLog(g, `Il brevetto di ${product.code} scade.`, "bad");
+        pushLog(g, `Il brevetto di ${product.code} scade: arrivano i generici sul mercato.`, "bad");
       }
     }
   }
   g.playerShare = clamp(g.playerShare + drift, 0, cap);
 }
 
-function upkeep(g: Game) {
-  let burn = 0;
+function upkeep(g: Game, ledger?: WeekLedger) {
+  let facilityBurn = 0;
+  let payrollBurn = 0;
   for (const room of g.rooms) {
-    burn += roomDef(room.type).upkeep * (1 + 0.2 * (room.level - 1));
-    for (const slot of room.slots) if (slot.item) burn += gearDef(slot.item.defId).upkeep * slot.item.level;
+    facilityBurn += roomDef(room.type).upkeep * (1 + 0.2 * (room.level - 1));
+    for (const slot of room.slots) if (slot.item) facilityBurn += gearDef(slot.item.defId).upkeep * slot.item.level;
   }
-  for (const tile of g.tiles.flat()) if (tile.corridor) burn += 400;
-  for (const s of g.staff) burn += s.salary;
-  g.cash -= Math.round(burn);
+  for (const tile of g.tiles.flat()) if (tile.corridor) facilityBurn += 400;
+  for (const s of g.staff) payrollBurn += s.salary;
+
+  const totalBurn = facilityBurn + payrollBurn;
+  g.cash -= Math.round(totalBurn);
+  if (ledger) {
+    ledger.expenses.payroll += Math.round(payrollBurn);
+    ledger.expenses.upkeep += Math.round(facilityBurn);
+  }
+  g.stats.totalWagesPaid = (g.stats.totalWagesPaid ?? 0) + Math.round(payrollBurn);
+
+  // Interest on loans
+  if (g.finance && g.finance.loan > 0) {
+    const interest = Math.round(g.finance.loan * g.finance.weeklyInterestRate);
+    g.cash -= interest;
+    if (ledger) ledger.expenses.interest += interest;
+    g.stats.totalInterestPaid = (g.stats.totalInterestPaid ?? 0) + interest;
+  }
+
+  // Work experience & morale progression for assigned staff
+  for (const s of g.staff) {
+    if (s.roomId) {
+      const room = g.rooms.find((r) => r.id === s.roomId);
+      if (room && roomOnline(g, room) && room.halt === 0) {
+        const res = grantStaffWorkXP(s, true);
+        if (res.leveledUp) {
+          pushLog(g, `${s.name} è cresciuto con l'esperienza: abilità ${res.newSkill}!`, "good");
+          addFloating(`▲ ${s.name} Liv.${res.newSkill}`, "gold", room.c, room.r);
+        }
+      }
+    }
+  }
+
   for (const room of g.rooms) if (room.halt > 0) room.halt -= 1;
   const qa = g.staff.filter((member) => member.role === "qa" && ["qc", "stability"].includes(g.rooms.find((r) => r.id === member.roomId)?.type ?? ""));
   if (qa.length) {
@@ -2317,7 +2420,20 @@ function upkeep(g: Game) {
   }
 }
 
-function worldEvent(g: Game) {
+function worldEvent(g: Game, ledger?: WeekLedger) {
+  // Decision events trigger check
+  if (!g.pendingDecision && g.week > 10 && roll(g.week * 23 + g.seq) > 0.45) {
+    const eligible = DECISION_EVENTS.filter((e) => !g.eventHistory?.includes(e.id) && e.canTrigger(g));
+    if (eligible.length > 0) {
+      const picked = eligible[Math.floor(roll(g.week * 13 + g.seq) * eligible.length)]!;
+      g.pendingDecision = picked;
+      g.eventHistory ??= [];
+      g.eventHistory.push(picked.id);
+      pushLog(g, `Dilemma strategico: ${picked.title}. Richiesta una decisione.`, "info");
+      return;
+    }
+  }
+
   if (g.week < g.nextEvent) return;
   g.nextEvent = g.week + 8 + Math.floor(roll(g.week * 11) * 5);
   const n = Math.floor(roll(g.week * 29) * 8);
@@ -2329,6 +2445,7 @@ function worldEvent(g: Game) {
       const weeks = hasGear(g, "generatore") ? 1 : 2;
       for (const room of g.rooms) if (room.type === "pilot" || room.type === "plant" || room.type === "sterile") room.halt = Math.max(room.halt, weeks);
       g.cash -= 80_000;
+      if (ledger) ledger.expenses.penalties += 80_000;
       pushLog(g, "Ispezione. Linee ferme e una multa.", "bad");
     } else pushLog(g, "Ispezione superata.", "good");
   } else if (n === 2) {
@@ -2337,6 +2454,7 @@ function worldEvent(g: Game) {
   } else if (n === 3 && hasGear(g, "banco")) {
     g.cash += 160_000;
     g.science += 3;
+    if (ledger) ledger.revenue.grants += 160_000;
     pushLog(g, "Bando di ricerca. Cassa e scienza.", "good");
   } else if (n === 4) {
     g.candidates.push(person(g, "operator", 4, g.week + 4));
@@ -2392,12 +2510,14 @@ function rivalPress(g: Game) {
   }
 }
 
-function markGoals(g: Game) {
+function markGoals(g: Game, ledger?: WeekLedger) {
   const done = new Set(g.goals);
   const give = (id: string, text: string, cash: number) => {
     if (done.has(id)) return;
     g.goals.push(id);
     g.cash += cash;
+    if (ledger) ledger.revenue.goals += cash;
+    addFloating(`+${euro(cash)}`, "gold", 1, 1);
     pushLog(g, `${text} Premio ${euro(cash)}.`, "good");
   };
   if (g.tiles.flat().filter((t) => t.corridor).length >= 6) give("corr", "Il corridoio cammina.", 15_000);
@@ -2414,7 +2534,25 @@ function markGoals(g: Game) {
   if (g.pipeline.some((p) => p.patented)) give("pat", "Brevetto depositato.", 60_000);
   if (g.stats.approvals) give("ok", "Prima approvazione.", 150_000);
   if (g.stats.launches) give("go", "Farmaco in commercio.", 120_000);
+
+  // Check achievements catalog
+  g.achievements ??= [];
+  for (const ach of ACHIEVEMENTS_LIST) {
+    if (!g.achievements.includes(ach.id) && ach.isUnlocked(g)) {
+      g.achievements.push(ach.id);
+      if (ach.rewardCash) {
+        g.cash += ach.rewardCash;
+        if (ledger) ledger.revenue.goals += ach.rewardCash;
+      }
+      if (ach.rewardSci) {
+        g.science += ach.rewardSci;
+      }
+      pushLog(g, `Traguardo sbloccato: ${ach.icon} ${ach.title}!`, "good");
+      addFloating(`${ach.icon} ${ach.title}`, "gold", 1, 1);
+    }
+  }
 }
+
 function refreshChapter(g: Game) {
   const phase = g.pipeline.some((p) => ["phase1", "phase2", "phase3", "dossier", "review", "approved"].includes(p.stage));
   if (g.stats.launches >= 2 || g.playerShare >= 18) g.chapter = "Piattaforma";
@@ -2428,21 +2566,168 @@ function refreshChapter(g: Game) {
 
 export function tick(g: Game) {
   const next = structuredClone(g) as Game;
+  heal(next);
   next.week += 1;
+  const currentLedger = createEmptyLedger(next.week, next.cash);
+
   if (next.mod && next.week > next.mod.until) next.mod = null;
-  upkeep(next);
-  produce(next);
+  upkeep(next, currentLedger);
+  produce(next, currentLedger);
   research(next);
-  commerce(next);
-  worldEvent(next);
+  commerce(next, currentLedger);
+  worldEvent(next, currentLedger);
   rivalPress(next);
   candidates(next);
   refreshOffers(next, false);
   maybeRefinance(next);
-  markGoals(next);
+  markGoals(next, currentLedger);
   refreshChapter(next);
+
+  // Enterprise valuation & credit check
+  const val = calculateEnterpriseValuation(next);
+  next.valuation = val.total;
+  next.stats.highestValuation = Math.max(next.stats.highestValuation ?? 0, val.total);
+
+  const cRank = currentRank(val.total);
+  const prevRankId = (next.stats as any).lastRankId;
+  if (!prevRankId) {
+    (next.stats as any).lastRankId = cRank.id;
+  } else if (prevRankId !== cRank.id) {
+    (next.stats as any).lastRankId = cRank.id;
+    const bonusCash = Math.min(1_000_000, Math.round(cRank.minValuation * 0.02));
+    if (bonusCash > 0) {
+      next.cash += bonusCash;
+      next.reputation = clamp(next.reputation + 5, 0, 100);
+      pushLog(next, `PROMOZIONE AZIENDALE: Aurelia sale a '${cRank.title}'! Premio crescita +${euro(bonusCash)}. (${cRank.perk})`, "good");
+      addFloating(`GRADO: ${cRank.title}`, "gold", 1, 1);
+    }
+  }
+
+  if (next.finance) {
+    const cred = calculateCreditRating(next.stats.revenue, next.cash, next.finance.loan, next.reputation);
+    next.finance.creditRating = cred.rating;
+    next.finance.weeklyInterestRate = cred.interestRate;
+    next.finance.maxLoan = cred.maxLoan;
+  }
+
+  finalizeLedger(currentLedger, next.cash);
+  next.lastWeekSummary = currentLedger;
+  next.ledger ??= [];
+  next.ledger.push(currentLedger);
+  if (next.ledger.length > 52) next.ledger.shift();
+
   next.history.push(Math.round(next.cash));
-  if (next.history.length > 36) next.history.shift();
+  if (next.history.length > 52) next.history.shift();
+  return next;
+}
+
+export function resolveDecision(g: Game, choiceId: string): Game {
+  const next = structuredClone(g) as Game;
+  if (!next.pendingDecision) return next;
+  const choice = next.pendingDecision.choices.find((c) => c.id === choiceId);
+  if (!choice) return next;
+  if (choice.cost && next.cash < choice.cost) return next;
+  const res = choice.apply(next);
+  pushLog(next, res.log, res.tone);
+  next.pendingDecision = null;
+  return next;
+}
+
+export function borrowMoney(g: Game, amount: number): Game | string {
+  const next = structuredClone(g) as Game;
+  next.finance ??= initialFinanceState();
+  if (next.finance.loan + amount > next.finance.maxLoan) {
+    return `La banca rifiuta: fido massimo ${euro(next.finance.maxLoan)}. Rating attuale ${next.finance.creditRating}.`;
+  }
+  next.finance.loan += amount;
+  next.cash += amount;
+  pushLog(next, `Accreditato prestito bancario di ${euro(amount)}. Fido residuo ${euro(next.finance.maxLoan - next.finance.loan)}.`, "good");
+  addFloating(`+${euro(amount)}`, "good", 1, 1);
+  return next;
+}
+
+export function repayMoney(g: Game, amount: number): Game | string {
+  const next = structuredClone(g) as Game;
+  next.finance ??= initialFinanceState();
+  if (next.finance.loan <= 0) return "Nessun debito in essere.";
+  const pay = Math.min(amount, next.finance.loan);
+  if (next.cash < pay) return "Cassa insufficiente per rimborsare il prestito.";
+  next.cash -= pay;
+  next.finance.loan -= pay;
+  pushLog(next, `Rimborsati ${euro(pay)} del fido bancario. Debito residuo ${euro(next.finance.loan)}.`, "good");
+  addFloating(`-${euro(pay)}`, "info", 1, 1);
+  return next;
+}
+
+export function acceptInvestmentRound(g: Game, roundId: string): Game | string {
+  const next = structuredClone(g) as Game;
+  next.finance ??= initialFinanceState();
+  const round = next.finance.rounds.find((r) => r.id === roundId);
+  if (!round || round.completed) return "Round non disponibile o già completato.";
+  if (round.needBatches && next.stats.batches < round.needBatches) {
+    return `Servono almeno ${round.needBatches} lotti consegnati per questo investitore.`;
+  }
+  round.completed = true;
+  next.cash += round.cashRaised;
+  next.finance.equityOwned = Math.max(10, next.finance.equityOwned - round.equityPercent);
+  if (round.id === "ipo") {
+    next.finance.ipoDone = true;
+    pushLog(next, `CAMPANELLA SUONATA! Quotazione in Borsa (IPO) completata: raccolti ${euro(round.cashRaised)}!`, "good");
+  } else {
+    pushLog(next, `Chiuso ${round.name} con ${round.investor}: +${euro(round.cashRaised)} (ceduto ${round.equityPercent}% di quota).`, "good");
+  }
+  addFloating(`+${euro(round.cashRaised)}`, "gold", 1, 1);
+  return next;
+}
+
+export function acquireRival(g: Game, rivalId: string): Game | string {
+  const next = structuredClone(g) as Game;
+  heal(next);
+  const rival = next.rivals.find((r) => r.id === rivalId);
+  if (!rival) return "Concorrente non trovato.";
+  if ((rival as any).acquired) return "Azienda concorrente già acquisita.";
+
+  const estVal = Math.round(rival.share * 1_500_000);
+  const cost = Math.round(estVal * 0.45);
+  const myVal = calculateEnterpriseValuation(next).total;
+
+  if (myVal < estVal * 1.5) {
+    return `La tua valutazione (${euro(myVal)}) deve essere almeno 1.5x quella del rivale (${euro(estVal)}).`;
+  }
+  if (next.cash < cost) {
+    return `Fondi insufficienti per l'acquisizione: servono ${euro(cost)}.`;
+  }
+
+  next.cash -= cost;
+  (rival as any).acquired = true;
+  const absorbedShare = Math.round(rival.share * 0.75);
+  rival.share = Math.max(0, rival.share - absorbedShare);
+  next.playerShare = clamp(next.playerShare + absorbedShare, 0, shareCap(next));
+  next.reputation = clamp(next.reputation + 8, 0, 100);
+
+  pushLog(next, `M&A STRAORDINARIO: Aurelia ha acquisito e fuso ${rival.name}! Quota assorbita +${absorbedShare}%.`, "good");
+  addFloating(`M&A: +${absorbedShare}% Quota`, "gold", 1, 1);
+  return next;
+}
+
+export function extendPatent(g: Game, productId: string): Game | string {
+  const next = structuredClone(g) as Game;
+  heal(next);
+  const product = next.products.find((p) => p.id === productId);
+  if (!product) return "Farmaco non trovato.";
+  const cost = 75_000;
+  const sciCost = 3;
+
+  if (next.cash < cost) return `Servono ${euro(cost)} per i trial della nuova formulazione.`;
+  if (next.science < sciCost) return `Servono almeno ${sciCost} punti scienza per la nuova formulazione.`;
+
+  next.cash -= cost;
+  next.science -= sciCost;
+  product.patentLeft = (product.patentLeft ?? 0) + 120;
+  product.price = clamp(product.price + 10, 70, 180);
+
+  pushLog(next, `Nuova formulazione registrata per ${product.code}: brevetto esteso di 120 settimane (+10 € al pezzo)!`, "good");
+  addFloating(`Brevetto +120 sett.`, "gold", 1, 1);
   return next;
 }
 
