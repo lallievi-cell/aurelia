@@ -1,5 +1,15 @@
 import * as THREE from "three";
 import {
+  grassTexture,
+  paverTexture,
+  asphaltTexture,
+  epoxyTexture,
+  vinylTexture,
+  concreteTexture,
+  skyTexture,
+  withRepeat,
+} from "@/tycoon/textures3d";
+import {
   COLS,
   ROWS,
   PARCELS,
@@ -170,8 +180,8 @@ export class ThreeCampus {
 
     // 1. Scene with soft atmospheric haze and sky dome
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0xdceee7);
-    this.scene.fog = new THREE.FogExp2(0xdceee7, 0.007);
+    this.scene.background = skyTexture();
+    this.scene.fog = new THREE.FogExp2(0xdfebee, 0.0065);
 
     // 2. Camera (True Isometric Orthographic)
     const frustumSize = this.currentZoom;
@@ -725,9 +735,10 @@ export class ThreeCampus {
 
     // 1. Vast Natural Landscape Terrain
     const grassGeo = new THREE.PlaneGeometry(180, 180);
+    const grassTex = withRepeat(grassTexture(), 36, 36);
     const grassMat = new THREE.MeshStandardMaterial({
-      color: 0x427552, // Rich organic park lawn
-      roughness: 0.96,
+      map: grassTex,
+      roughness: 0.92,
       metalness: 0.02,
     });
     const grassMesh = new THREE.Mesh(grassGeo, grassMat);
@@ -737,8 +748,10 @@ export class ThreeCampus {
     this.environmentGroup.add(grassMesh);
 
     // 2. Concrete Campus Podium Under the Grid (strictly lower than tile surface to prevent z-fighting)
+    const concreteTex = withRepeat(concreteTexture(), 10, 10);
     const plinthMat = new THREE.MeshStandardMaterial({
-      color: 0x94a3b8, // Clean industrial foundation concrete
+      map: concreteTex,
+      color: 0xd8e0e6,
       roughness: 0.8,
       metalness: 0.05,
     });
@@ -761,7 +774,6 @@ export class ThreeCampus {
     this.environmentGroup.add(curbWest);
 
     // 3. Perimeter Asphalt Two-Lane Roadway (South & East Borders)
-    const roadMat = new THREE.MeshStandardMaterial({ color: 0x273038, roughness: 0.85 });
     const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
     const yellowLineMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
 
@@ -769,7 +781,9 @@ export class ThreeCampus {
     const roadZ = campusDepth / 2 + 4.2;
     const roadWidth = 5.4;
     const roadLength = campusWidth + 24;
-    const southRoad = new THREE.Mesh(new THREE.BoxGeometry(roadLength, 0.12, roadWidth), roadMat);
+    const southRoadTex = withRepeat(asphaltTexture(), 16, 2);
+    const southRoadMat = new THREE.MeshStandardMaterial({ map: southRoadTex, roughness: 0.85 });
+    const southRoad = new THREE.Mesh(new THREE.BoxGeometry(roadLength, 0.12, roadWidth), southRoadMat);
     southRoad.position.set(0, -0.22, roadZ);
     southRoad.receiveShadow = true;
     this.environmentGroup.add(southRoad);
@@ -780,7 +794,9 @@ export class ThreeCampus {
 
     // East Road
     const roadX = campusWidth / 2 + 4.2;
-    const eastRoad = new THREE.Mesh(new THREE.BoxGeometry(roadWidth, 0.12, campusDepth + 24), roadMat);
+    const eastRoadTex = withRepeat(asphaltTexture(), 2, 16);
+    const eastRoadMat = new THREE.MeshStandardMaterial({ map: eastRoadTex, roughness: 0.85 });
+    const eastRoad = new THREE.Mesh(new THREE.BoxGeometry(roadWidth, 0.12, campusDepth + 24), eastRoadMat);
     eastRoad.position.set(roadX, -0.22, 0);
     eastRoad.receiveShadow = true;
     this.environmentGroup.add(eastRoad);
@@ -889,9 +905,10 @@ export class ThreeCampus {
     group.position.set(x, y, z);
 
     // Asphalt surface
+    const lotTex = withRepeat(asphaltTexture(), 4, 2);
     const lotMesh = new THREE.Mesh(
       new THREE.BoxGeometry(9.6, 0.14, 5.2),
-      new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.85 })
+      new THREE.MeshStandardMaterial({ map: lotTex, roughness: 0.85 })
     );
     lotMesh.position.y = 0.07;
     lotMesh.receiveShadow = true;
@@ -1220,9 +1237,27 @@ export class ThreeCampus {
   private buildTerrain(game: Game) {
     const slabGeo = new THREE.BoxGeometry(TILE_SIZE * 0.992, 0.22, TILE_SIZE * 0.992);
 
-    const matOwnedLot = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.65, metalness: 0.05 });
-    const matGarden = new THREE.MeshStandardMaterial({ color: 0x228b48, roughness: 0.85, metalness: 0.02 });
-    const matUnowned = new THREE.MeshStandardMaterial({ color: 0x3d7049, roughness: 0.92, metalness: 0.02 });
+    const paverTex = withRepeat(paverTexture(), 1, 1);
+    const matOwnedLot = new THREE.MeshStandardMaterial({
+      map: paverTex,
+      color: 0xf1f5f9,
+      roughness: 0.65,
+      metalness: 0.05,
+    });
+    const gardenTex = withRepeat(grassTexture(), 1.5, 1.5);
+    const matGarden = new THREE.MeshStandardMaterial({
+      map: gardenTex,
+      color: 0x5ea344,
+      roughness: 0.88,
+      metalness: 0.02,
+    });
+    const unownedTex = withRepeat(grassTexture(), 1, 1);
+    const matUnowned = new THREE.MeshStandardMaterial({
+      map: unownedTex,
+      color: 0x3d7049,
+      roughness: 0.92,
+      metalness: 0.02,
+    });
     const matSelected = new THREE.MeshStandardMaterial({
       color: 0xf59e0b,
       roughness: 0.35,
@@ -1336,7 +1371,11 @@ export class ThreeCampus {
     stone.position.set(0, 0.03, 0);
     group.add(stone);
 
-    // Tree
+    // Varied tree species: alternate between lush green oak and flowering dogwood pink/white
+    const seed = Math.abs(Math.sin(x * 12.9898 + z * 78.233)) * 1000;
+    const isFlowering = (seed % 3) > 1.8;
+    const leafColor = isFlowering ? 0xf472b6 : 0x15803d;
+
     const trunk = new THREE.Mesh(
       new THREE.CylinderGeometry(0.12, 0.18, 1.1, 6),
       new THREE.MeshStandardMaterial({ color: 0x5a3e2b, roughness: 0.9 })
@@ -1347,7 +1386,7 @@ export class ThreeCampus {
 
     const foliage = new THREE.Mesh(
       new THREE.SphereGeometry(0.72, 8, 6),
-      new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.8 })
+      new THREE.MeshStandardMaterial({ color: leafColor, roughness: 0.8 })
     );
     foliage.position.set(0.3, 1.45, 0.3);
     foliage.castShadow = true;
@@ -1361,15 +1400,36 @@ export class ThreeCampus {
     flowerbed.position.set(-0.4, 0.06, -0.4);
     group.add(flowerbed);
 
-    for (let f = 0; f < 4; f++) {
+    for (let f = 0; f < 5; f++) {
+      const bloomColor = f % 2 === 0 ? 0xf43f5e : f % 3 === 0 ? 0xa855f7 : 0xfbbf24;
       const bloom = new THREE.Mesh(
         new THREE.SphereGeometry(0.08, 6, 4),
-        new THREE.MeshBasicMaterial({ color: f % 2 === 0 ? 0xf43f5e : 0xfbbf24 })
+        new THREE.MeshBasicMaterial({ color: bloomColor })
       );
-      const ang = (f * Math.PI) / 2;
+      const ang = (f * Math.PI * 2) / 5;
       bloom.position.set(-0.4 + Math.cos(ang) * 0.18, 0.18, -0.4 + Math.sin(ang) * 0.18);
       group.add(bloom);
     }
+
+    // Modern illuminated garden bollard
+    const bollardPost = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.04, 0.05, 0.42, 8),
+      new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.7, roughness: 0.3 })
+    );
+    bollardPost.position.set(-0.45, 0.21, 0.35);
+    group.add(bollardPost);
+
+    const bollardHead = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.06, 0.06, 0.08, 8),
+      new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        emissive: 0xfef08a,
+        emissiveIntensity: 0.75,
+        roughness: 0.2,
+      })
+    );
+    bollardHead.position.set(-0.45, 0.44, 0.35);
+    group.add(bollardHead);
 
     this.groundGroup.add(group);
   }
@@ -1379,10 +1439,12 @@ export class ThreeCampus {
   // 3. PRISTINE SANITARY CORRIDORS (AUTO-TILING & ADAPTIVE DIRECTION)
   // ------------------------------------------
   private buildCorridors(game: Game) {
+    const vinylTex = withRepeat(vinylTexture(), 1, 1);
     const floorMat = new THREE.MeshStandardMaterial({
-      color: 0xf8fafc,
-      roughness: 0.15,
-      metalness: 0.12,
+      map: vinylTex,
+      color: 0xffffff,
+      roughness: 0.2,
+      metalness: 0.1,
     });
     const agvTrackMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
     const hubMat = new THREE.MeshBasicMaterial({ color: 0x34d399 });
@@ -1648,12 +1710,14 @@ export class ThreeCampus {
     }
 
     // High-gloss Cleanroom Floor Slab with subtle beveled border
+    const epoxyTex = withRepeat(epoxyTexture(), Math.max(1, room.w), Math.max(1, room.h));
     const floorGeo = new THREE.BoxGeometry(roomW * 0.98, 0.16, roomD * 0.98);
     const floorMat = new THREE.MeshStandardMaterial({
+      map: epoxyTex,
       color: floorColor,
       emissive: emissiveColor,
       emissiveIntensity: emissiveInt,
-      roughness: 0.15,
+      roughness: 0.18,
       metalness: 0.1,
     });
     const floorMesh = new THREE.Mesh(floorGeo, floorMat);
@@ -1794,6 +1858,74 @@ export class ThreeCampus {
     const northLed = new THREE.Mesh(new THREE.BoxGeometry(roomW * 0.85, 0.04, 0.18), ledMat);
     northLed.position.set(0, wallHeight - 0.04, wallThick / 2 + 0.09);
     northGroup.add(northLed);
+
+    // North wall Rooftop AHU (Air Handling Unit) & Status Stack Light Beacon
+    const ahuW = Math.min(1.4, roomW * 0.45);
+    const ahuH = 0.42;
+    const ahuD = 0.38;
+    const ahuX = -roomW * 0.2;
+    const ahuGroup = new THREE.Group();
+    ahuGroup.position.set(ahuX, wallHeight + 0.03, 0);
+
+    // AHU housing body (galvanized sheet)
+    const ahuBody = new THREE.Mesh(
+      new THREE.BoxGeometry(ahuW, ahuH, ahuD),
+      new THREE.MeshStandardMaterial({ color: 0xcfd8dc, roughness: 0.35, metalness: 0.5 })
+    );
+    ahuBody.position.y = ahuH / 2;
+    ahuBody.castShadow = true;
+    ahuGroup.add(ahuBody);
+
+    // AHU front intake louver
+    const louver = new THREE.Mesh(
+      new THREE.BoxGeometry(ahuW * 0.8, ahuH * 0.6, 0.02),
+      new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.6 })
+    );
+    louver.position.set(0, ahuH / 2, ahuD / 2 + 0.01);
+    ahuGroup.add(louver);
+
+    // AHU exhaust fan cowl with spinning blades
+    const fanCowl = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.18, 0.18, 0.08, 12),
+      new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7 })
+    );
+    fanCowl.position.set(0, ahuH + 0.04, 0);
+    ahuGroup.add(fanCowl);
+
+    const fanSpinner = new THREE.Mesh(
+      new THREE.BoxGeometry(0.32, 0.02, 0.05),
+      new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.8 })
+    );
+    fanSpinner.position.set(0, ahuH + 0.08, 0);
+    ahuGroup.add(fanSpinner);
+    if (online) {
+      this.animatedSpinners.push({ mesh: fanSpinner, speed: 10 });
+    }
+
+    northGroup.add(ahuGroup);
+
+    // Status Stack Light Tower on NE Corner of wall
+    const stackX = roomW / 2 - 0.15;
+    const stackPole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.02, 0.02, 0.45, 6),
+      new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.8 })
+    );
+    stackPole.position.set(stackX, wallHeight + 0.225, 0);
+    northGroup.add(stackPole);
+
+    // Active status beacon (Green for online & active, Amber for halt/warning, Red for offline)
+    const beaconColor = !online ? 0xef4444 : room.halt > 0 ? 0xf59e0b : 0x10b981;
+    const statusBeacon = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.045, 0.045, 0.12, 8),
+      new THREE.MeshStandardMaterial({
+        color: beaconColor,
+        emissive: beaconColor,
+        emissiveIntensity: 0.85,
+        roughness: 0.1,
+      })
+    );
+    statusBeacon.position.set(stackX, wallHeight + 0.48, 0);
+    northGroup.add(statusBeacon);
 
     roomRoot.add(northGroup);
 
